@@ -1,0 +1,7 @@
+$kind: http-request
+url: http://localhost:3000/categories
+method: POST
+body:
+  type: json
+  content: ""
+order: 4400271400410856
