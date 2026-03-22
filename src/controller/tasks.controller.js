@@ -20,7 +20,7 @@ import {
     assignUsersToTask   as addUsersToTask,
     removeUserFromTask  as detachUser,
     filterTasks         as filterTasksModel
-} from '../models/taskModel.js';
+} from '../models/tasks.model.js';
 
 // GET /api/tasks
 // Retorna todas las tareas
