@@ -4,8 +4,8 @@ import cors from 'cors';
 // Se importan los archivos de rutas NUEVOS creados por Paulo en esta guía
 // userRoutes.js reemplaza a users.routes.js (los archivos viejos NO se borran)
 // taskRoutes.js reemplaza a tasks.routes.js
-import usersRouter from './routes/userRoutes.js';
-import tasksRouter from './routes/taskRoutes.js';
+import usersRouter from './routes/users.routes.js';
+import tasksRouter from './routes/tasks.routes.js';
 
 // Se crea la instancia principal del servidor Express
 const app = express();

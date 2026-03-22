@@ -16,10 +16,10 @@ import {
     createUser     as insertUser,
     updateUser     as modifyUser,
     deleteUser     as removeUser
-} from '../models/userModel.js';
+} from '../models/users.model.js';
 
 // Se importa getTasksByUserId del modelo de tareas para getUserTasks
-import { getTasksByUserId } from '../models/taskModel.js';
+import { getTasksByUserId } from '../models/tasks.model.js';
 
 // GET /api/users
 // Retorna todos los usuarios

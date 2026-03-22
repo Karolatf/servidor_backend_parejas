@@ -1,8 +1,0 @@
-$kind: http-request
-name: get products
-url: http://localhost:3000/products
-method: GET
-body:
-  type: json
-  content: ""
-order: 1773712613246
