@@ -7,7 +7,7 @@ Este documento establece las reglas de convivencia, comunicación y estándares 
 | :--- | :--- | :--- |
 | Karol Torres | Líder (Arquitecto) | `@karolatf` |
 | Sebastián Patiño | Desarrollador | `@SebasPatino` |
-| [Nombre del Aprendiz 3] | Desarrollador | `@usuario3` |
+|Paulo Zapata | Desarrollador | `Pauloz17` |
 
 ## 2. Canales de Comunicación
 Para mantener el orden y separar lo profesional de lo personal, usaremos los siguientes canales:
