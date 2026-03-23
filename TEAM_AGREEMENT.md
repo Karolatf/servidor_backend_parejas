@@ -6,7 +6,7 @@ Este documento establece las reglas de convivencia, comunicación y estándares 
 | Nombre | Rol | Usuario de GitHub |
 | :--- | :--- | :--- |
 | Karol Torres | Líder (Arquitecto) | `@karolatf` |
-| [Nombre del Aprendiz 2] | Desarrollador | `@usuario2` |
+| Sebastián Patiño | Desarrollador | `@SebasPatino` |
 | [Nombre del Aprendiz 3] | Desarrollador | `@usuario3` |
 
 ## 2. Canales de Comunicación
