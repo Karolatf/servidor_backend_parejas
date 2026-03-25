@@ -27,9 +27,12 @@ import {
 // Paulo: router.get('/', getTasks)
 // IMPORTANTE: Karol usa GET /api/tasks en adminPanel.js y en buscarUsuario.js
 // La respuesta incluye assignedUsers como arreglo de números (garantizado por el modelo)
-export function getTasks(req, res) {
+// CORREGIDO: se agregó async porque getAllTasks() es una función asíncrona (usa await internamente)
+export async function getTasks(req, res) {
     try {
-        const tareas = getAllTasks();
+        // CORREGIDO: se agregó await para esperar el resultado de getAllTasks()
+        // sin await, tareas sería una Promise pendiente en lugar del arreglo de tareas
+        const tareas = await getAllTasks();
         res.status(200).json(tareas);
     } catch (error) {
         console.error('Error en getTasks:', error);
@@ -41,10 +44,13 @@ export function getTasks(req, res) {
 // Retorna una tarea por su id
 // Paulo: router.get('/:id', getTaskById)
 // NOTA: Paulo define /filter y /dashboard ANTES de /:id para que Express no los confunda
-export function getTaskById(req, res) {
+// CORREGIDO: se agregó async porque findTaskById() es una función asíncrona
+export async function getTaskById(req, res) {
     try {
         const { id } = req.params;
-        const tarea = findTaskById(id);
+        // CORREGIDO: se agregó await para esperar el resultado de findTaskById()
+        // sin await, tarea sería una Promise y el if (!tarea) nunca sería true aunque no exista
+        const tarea = await findTaskById(id);
 
         if (!tarea) {
             return res.status(404).json({ error: `Tarea con id ${id} no encontrada` });
@@ -60,7 +66,8 @@ export function getTaskById(req, res) {
 // POST /api/tasks
 // Crea una tarea nueva
 // Paulo: router.post('/', createTask)
-export function createTask(req, res) {
+// CORREGIDO: se agregó async porque insertTask() es una función asíncrona
+export async function createTask(req, res) {
     try {
         const { title, description, status, assignedUsers } = req.body;
 
@@ -68,7 +75,9 @@ export function createTask(req, res) {
             return res.status(400).json({ error: 'El campo title es obligatorio' });
         }
 
-        const nuevaTarea = insertTask({ title, description, status, assignedUsers });
+        // CORREGIDO: se agregó await para esperar que insertTask() termine de guardar en la BD
+        // sin await, nuevaTarea sería una Promise y se enviaría como respuesta en lugar del objeto real
+        const nuevaTarea = await insertTask({ title, description, status, assignedUsers });
         res.status(201).json(nuevaTarea);
     } catch (error) {
         console.error('Error en createTask:', error);
@@ -79,12 +88,15 @@ export function createTask(req, res) {
 // PUT /api/tasks/:id
 // Actualiza una tarea
 // Paulo: router.put('/:id', updateTask)
-export function updateTask(req, res) {
+// CORREGIDO: se agregó async porque modifyTask() es una función asíncrona
+export async function updateTask(req, res) {
     try {
         const { id } = req.params;
         const campos = req.body;
 
-        const tareaActualizada = modifyTask(id, campos);
+        // CORREGIDO: se agregó await para esperar el resultado de modifyTask()
+        // sin await, tareaActualizada sería una Promise y el if (!tareaActualizada) nunca funcionaría
+        const tareaActualizada = await modifyTask(id, campos);
 
         if (!tareaActualizada) {
             return res.status(404).json({ error: `Tarea con id ${id} no encontrada` });
@@ -100,10 +112,12 @@ export function updateTask(req, res) {
 // DELETE /api/tasks/:id
 // Elimina una tarea
 // Paulo: router.delete('/:id', deleteTask)
-export function deleteTask(req, res) {
+// CORREGIDO: se agregó async porque removeTask() es una función asíncrona
+export async function deleteTask(req, res) {
     try {
         const { id } = req.params;
-        const tareaEliminada = removeTask(id);
+        // CORREGIDO: se agregó await para esperar que removeTask() termine de eliminar en la BD
+        const tareaEliminada = await removeTask(id);
 
         if (!tareaEliminada) {
             return res.status(404).json({ error: `Tarea con id ${id} no encontrada` });
@@ -119,7 +133,8 @@ export function deleteTask(req, res) {
 // PATCH /api/tasks/:id/status
 // Cambia solo el estado de una tarea
 // Paulo: router.patch('/:id/status', updateTaskStatus)
-export function updateTaskStatus(req, res) {
+// CORREGIDO: se agregó async porque changeStatus() es una función asíncrona
+export async function updateTaskStatus(req, res) {
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -131,7 +146,9 @@ export function updateTaskStatus(req, res) {
             });
         }
 
-        const tareaActualizada = changeStatus(id, status);
+        // CORREGIDO: se agregó await para esperar el resultado de changeStatus()
+        // sin await, tareaActualizada sería una Promise y el if (!tareaActualizada) nunca funcionaría
+        const tareaActualizada = await changeStatus(id, status);
 
         if (!tareaActualizada) {
             return res.status(404).json({ error: `Tarea con id ${id} no encontrada` });
@@ -148,7 +165,8 @@ export function updateTaskStatus(req, res) {
 // Asigna usuarios a una tarea
 // Paulo: router.post('/:taskId/assign', assignUsersToTask)
 // Cuerpo: { userIds: [1, 2, 3] }
-export function assignUsersToTask(req, res) {
+// CORREGIDO: se agregó async porque addUsersToTask() es una función asíncrona
+export async function assignUsersToTask(req, res) {
     try {
         const { taskId } = req.params;
         const { userIds } = req.body;
@@ -157,7 +175,9 @@ export function assignUsersToTask(req, res) {
             return res.status(400).json({ error: 'Se requiere un arreglo userIds con al menos un id' });
         }
 
-        const tareaActualizada = addUsersToTask(taskId, userIds);
+        // CORREGIDO: se agregó await para esperar que addUsersToTask() termine de actualizar la BD
+        // sin await, tareaActualizada sería una Promise y el if (!tareaActualizada) nunca funcionaría
+        const tareaActualizada = await addUsersToTask(taskId, userIds);
 
         if (!tareaActualizada) {
             return res.status(404).json({ error: `Tarea con id ${taskId} no encontrada` });
@@ -173,10 +193,12 @@ export function assignUsersToTask(req, res) {
 // GET /api/tasks/:taskId/users
 // Retorna los ids de usuarios asignados a una tarea
 // Paulo: router.get('/:taskId/users', getAssignedUsers)
-export function getAssignedUsers(req, res) {
+// CORREGIDO: se agregó async porque findTaskById() es una función asíncrona
+export async function getAssignedUsers(req, res) {
     try {
         const { taskId } = req.params;
-        const tarea = findTaskById(taskId);
+        // CORREGIDO: se agregó await para esperar el resultado de findTaskById()
+        const tarea = await findTaskById(taskId);
 
         if (!tarea) {
             return res.status(404).json({ error: `Tarea con id ${taskId} no encontrada` });
@@ -192,10 +214,12 @@ export function getAssignedUsers(req, res) {
 // DELETE /api/tasks/:taskId/users/:userId
 // Quita un usuario de una tarea
 // Paulo: router.delete('/:taskId/users/:userId', removeUserFromTask)
-export function removeUserFromTask(req, res) {
+// CORREGIDO: se agregó async porque detachUser() es una función asíncrona
+export async function removeUserFromTask(req, res) {
     try {
         const { taskId, userId } = req.params;
-        const tareaActualizada = detachUser(taskId, userId);
+        // CORREGIDO: se agregó await para esperar que detachUser() termine de actualizar la BD
+        const tareaActualizada = await detachUser(taskId, userId);
 
         if (!tareaActualizada) {
             return res.status(404).json({ error: `Tarea con id ${taskId} no encontrada` });
@@ -213,10 +237,12 @@ export function removeUserFromTask(req, res) {
 // Paulo: router.get('/filter', filterTasks)
 // IMPORTANTE: Paulo define esta ruta ANTES de /:id para evitar conflicto de parámetros
 // Query: ?status=pendiente   ?userId=1   ?status=en_progreso&userId=2
-export function filterTasks(req, res) {
+// CORREGIDO: se agregó async porque filterTasksModel() es una función asíncrona
+export async function filterTasks(req, res) {
     try {
         const { status, userId } = req.query;
-        const resultado = filterTasksModel({ status, userId });
+        // CORREGIDO: se agregó await para esperar el arreglo filtrado de filterTasksModel()
+        const resultado = await filterTasksModel({ status, userId });
         res.status(200).json(resultado);
     } catch (error) {
         console.error('Error en filterTasks:', error);
@@ -228,9 +254,12 @@ export function filterTasks(req, res) {
 // Retorna estadísticas generales del sistema
 // Paulo: router.get('/dashboard', getDashboard)
 // IMPORTANTE: Paulo define esta ruta ANTES de /:id para evitar conflicto de parámetros
-export function getDashboard(req, res) {
+// CORREGIDO: se agregó async porque getAllTasks() es una función asíncrona
+export async function getDashboard(req, res) {
     try {
-        const tareas = getAllTasks();
+        // CORREGIDO: se agregó await para esperar el arreglo completo de tareas
+        // sin await, tareas sería una Promise y .filter() lanzaría un error
+        const tareas = await getAllTasks();
 
         // Se calculan totales por estado
         const pendientes  = tareas.filter(t => t.status === 'pendiente').length;
