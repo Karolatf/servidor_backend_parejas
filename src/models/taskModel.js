@@ -1,4 +1,4 @@
-/ MÓDULO: models/taskModel.js
+// MÓDULO: models/taskModel.js
 // CAPA: Modelo (datos y operaciones sobre los datos)
 
 // Responsabilidad única: manejar la fuente de datos de tareas.

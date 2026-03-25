@@ -1,3 +1,6 @@
+// inicializa el pool de conexiones con MySQL al arrancar el servidor
+// debe ser el primer import para que el pool esté listo antes de que lleguen peticiones
+import './database/connection.js';
 import express from 'express';
 import cors from 'cors';
 

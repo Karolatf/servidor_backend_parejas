@@ -1,2 +1,4 @@
 /node_modules
 /.DS_Store
+# Variables de entorno — contiene contraseñas reales, NUNCA subir a GitHub
+.env
