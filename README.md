@@ -109,16 +109,16 @@ npm run preview
 ```
 src/
 ├── database/
-│   └── connection.js       ← pool de conexiones MySQL con dotenv
+│   └── db.connection.js       ← pool de conexiones MySQL con dotenv
 ├── models/
-│   ├── userModel.js        ← CRUD sobre la tabla users en MySQL
-│   └── taskModel.js        ← CRUD sobre la tabla tasks en MySQL
+│   ├── user.model.js        ← CRUD sobre la tabla users en MySQL
+│   └── task.model.js        ← CRUD sobre la tabla tasks en MySQL
 ├── controller/
 │   ├── users.controller.js ← recibe req/res, llama al modelo de usuarios
 │   └── tasks.controller.js ← recibe req/res, llama al modelo de tareas
 ├── routes/
-│   ├── userRoutes.js       ← conecta endpoints /api/users con el controlador
-│   └── taskRoutes.js       ← conecta endpoints /api/tasks con el controlador
+│   ├── users.routes.js       ← conecta endpoints /api/users con el controlador
+│   └── tasks.routes.js       ← conecta endpoints /api/tasks con el controlador
 └── app.js                  ← instancia de Express, CORS, registro de rutas
 ```
 
@@ -320,7 +320,7 @@ Abrir MySQL Workbench → conexión `gestion_tareas_root` → ejecutar:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS gestion_tareas_sena;
-CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TORRES_2007';
+CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TU_CONTRASEÑA';
 GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
 FLUSH PRIVILEGES;
 ```

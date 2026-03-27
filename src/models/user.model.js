@@ -1,4 +1,4 @@
-// MÓDULO: models/users.model.js
+// MÓDULO: models/user.model.js
 // CAPA: Modelo (datos y operaciones sobre la tabla users en MySQL)
 //
 // Responsabilidad única: interactuar con la tabla users de MySQL.
@@ -7,7 +7,11 @@
 // pool.query retorna [filas, metadatos] — desestructuramos con [rows]
 // para tomar solo las filas y descartar los metadatos que no necesitamos.
 
-import pool from '../database/connection.js';
+import pool from '../database/db.connection.js';
+
+// campos que se pueden actualizar desde el exterior
+// cualquier otro campo que llegue en el body se ignora silenciosamente
+const CAMPOS_ACTUALIZABLES = ['documento', 'name', 'email'];
 
 // RF03 — READ: retorna todos los usuarios de la tabla users
 // el arreglo completo se usa en GET /api/users
@@ -28,7 +32,7 @@ export async function getUserById(id) {
 }
 
 // busca un usuario por su número de documento de identidad
-// Karol lo usa desde el frontend para buscar por documento
+// se usa desde el frontend para buscar por documento
 export async function getUserByDocumento(documento) {
     const [rows] = await pool.query(
         'SELECT * FROM users WHERE documento = ?',
@@ -49,14 +53,25 @@ export async function createUser({ documento, name, email }) {
 }
 
 // actualiza los campos de un usuario existente
-// Object.keys(campos) construye dinámicamente el SET del UPDATE
-// solo actualiza los campos que lleguen en el objeto (flexible)
+// solo se permiten los campos definidos en CAMPOS_ACTUALIZABLES
+// cualquier otro campo que llegue en el body se ignora para evitar corrupción de datos
 export async function updateUser(id, campos) {
     const existente = await getUserById(id);
     if (!existente) return null;
 
-    const parteSet = Object.keys(campos).map(c => `${c} = ?`).join(', ');
-    const valores  = Object.values(campos);
+    // filtra solo los campos permitidos que realmente llegaron en el body
+    const camposFiltrados = {};
+    for (const campo of CAMPOS_ACTUALIZABLES) {
+        if (campos[campo] !== undefined) {
+            camposFiltrados[campo] = campos[campo];
+        }
+    }
+
+    // si no hay campos válidos no se ejecuta el UPDATE
+    if (Object.keys(camposFiltrados).length === 0) return existente;
+
+    const parteSet = Object.keys(camposFiltrados).map(c => `${c} = ?`).join(', ');
+    const valores  = Object.values(camposFiltrados);
 
     await pool.query(
         `UPDATE users SET ${parteSet} WHERE id = ?`,

@@ -1,11 +1,11 @@
-// MÓDULO: models/tasks.model.js
+// MÓDULO: models/task.model.js
 // CAPA: Modelo (datos y operaciones sobre la tabla tasks en MySQL)
 //
 // MySQL no tiene tipo array nativo.
 // assigned_users se guarda como JSON string en la columna assigned_users.
 // serializarUsuarios y deserializarUsuarios convierten entre arreglo JS y string JSON.
 
-import pool from '../database/connection.js';
+import pool from '../database/db.connection.js';
 
 // convierte arreglo JS a JSON string para guardar en MySQL
 // ejemplo: [1, 2, 3] → '[1,2,3]'
@@ -64,18 +64,26 @@ export async function createTask({ title, description, status = 'pendiente', ass
 }
 
 // actualiza los campos de una tarea existente
-// convierte assignedUsers → assigned_users antes del UPDATE
+// lista blanca de campos permitidos para evitar actualizaciones no deseadas
 export async function updateTask(id, campos) {
     const existente = await getTaskById(id);
     if (!existente) return null;
 
+    // solo se permiten actualizar estos campos — cualquier otro se ignora
+    const camposPermitidos = ['title', 'description', 'status', 'assignedUsers'];
     const camposDb = {};
-    if (campos.title         !== undefined) camposDb.title          = campos.title;
-    if (campos.description   !== undefined) camposDb.description    = campos.description;
-    if (campos.status        !== undefined) camposDb.status         = campos.status;
-    if (campos.assignedUsers !== undefined) {
+
+    if (campos.title         !== undefined && camposPermitidos.includes('title'))
+        camposDb.title = campos.title;
+    if (campos.description   !== undefined)
+        camposDb.description = campos.description;
+    if (campos.status        !== undefined)
+        camposDb.status = campos.status;
+    if (campos.assignedUsers !== undefined)
         camposDb.assigned_users = serializarUsuarios(campos.assignedUsers);
-    }
+
+    // si no hay campos válidos no se ejecuta el UPDATE
+    if (Object.keys(camposDb).length === 0) return existente;
 
     const parteSet = Object.keys(camposDb).map(c => `${c} = ?`).join(', ');
     await pool.query(
@@ -113,56 +121,28 @@ export async function getTasksByUserId(userId) {
     return todas.filter(t => t.assignedUsers.includes(Number(userId)));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FUNCIONES AGREGADAS — estas no existían y el controlador las necesitaba
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AGREGADA: cambia solo el campo status de una tarea
-// el controlador la importa como: updateTaskStatus as changeStatus
+// cambia solo el campo status de una tarea
 // se usa en PATCH /api/tasks/:id/status
 export async function updateTaskStatus(id, status) {
-    // llama a updateTask pasando solo el campo status
-    // updateTask ya se encarga de verificar si la tarea existe (retorna null si no)
     return updateTask(id, { status });
 }
 
-// AGREGADA: agrega usuarios a la lista assignedUsers de una tarea
-// el controlador la importa como: assignUsersToTask as addUsersToTask
+// agrega usuarios a la lista assignedUsers de una tarea sin duplicados
 // se usa en POST /api/tasks/:taskId/assign
-// recibe: taskId (id de la tarea), userIds (arreglo de ids a agregar)
 export async function assignUsersToTask(taskId, userIds) {
-    // busca la tarea para obtener los usuarios que ya tiene asignados
     const tarea = await getTaskById(taskId);
-
-    // si la tarea no existe retorna null para que el controlador responda 404
     if (!tarea) return null;
 
-    // combina los usuarios existentes con los nuevos usando Set para evitar duplicados
-    // tarea.assignedUsers → arreglo actual (ej: [1, 2])
-    // userIds.map(Number) → convierte los nuevos ids a Number para consistencia (ej: [2, 3] → [2, 3])
-    // new Set([...]) → elimina duplicados (ej: [1, 2, 2, 3] → {1, 2, 3})
-    // [...new Set(...)] → convierte el Set de vuelta a arreglo (ej: [1, 2, 3])
     const nuevosUsuarios = [...new Set([...tarea.assignedUsers, ...userIds.map(Number)])];
-
-    // llama a updateTask para guardar el arreglo actualizado en la BD
     return updateTask(taskId, { assignedUsers: nuevosUsuarios });
 }
 
-// AGREGADA: quita un usuario específico de la lista assignedUsers de una tarea
-// el controlador la importa como: removeUserFromTask as detachUser
+// quita un usuario específico de la lista assignedUsers de una tarea
 // se usa en DELETE /api/tasks/:taskId/users/:userId
-// recibe: taskId (id de la tarea), userId (id del usuario a quitar)
 export async function removeUserFromTask(taskId, userId) {
-    // busca la tarea para obtener los usuarios actuales
     const tarea = await getTaskById(taskId);
-
-    // si la tarea no existe retorna null para que el controlador responda 404
     if (!tarea) return null;
 
-    // filtra el arreglo assignedUsers eliminando el usuario cuyo id coincide con userId
-    // Number(userId) convierte el parámetro de URL (string) a número para comparar correctamente
     const filtrados = tarea.assignedUsers.filter(id => id !== Number(userId));
-
-    // llama a updateTask para guardar el arreglo sin ese usuario en la BD
     return updateTask(taskId, { assignedUsers: filtrados });
 }
