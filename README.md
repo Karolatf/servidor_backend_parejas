@@ -215,3 +215,24 @@ En la industria, el software que no está publicado no existe. Esto vincula el r
 ---
 
 Este repositorio es propiedad del equipo de desarrollo y se rige por las políticas de formación profesional integral del SENA.
+## Base de Datos
+
+Este proyecto usa **MySQL 8.0** para la persistencia de datos.
+Los datos se mantienen aunque el servidor se reinicie.
+
+### Requisitos previos
+
+- MySQL 8.0 instalado
+- MySQL Workbench 8.0 CE
+
+### Configuración inicial (una sola vez por computador)
+
+**Paso 1 — Crear el usuario y la base de datos (con root)**
+
+Abrir MySQL Workbench → conexión `gestion_tareas_root` → ejecutar:
+
+```sql
+CREATE DATABASE IF NOT EXISTS gestion_tareas_sena;
+CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TORRES_2007';
+GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
+FLUSH PRIVILEGES;
