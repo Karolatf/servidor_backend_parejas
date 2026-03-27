@@ -1,4 +1,4 @@
-// MÓDULO: database/connection.js
+// MÓDULO: database/db.connection.js
 // CAPA: Base de datos (configuración de la conexión con MySQL)
 
 // Responsabilidad única: crear y exportar el pool de conexiones.
