@@ -1,220 +1,307 @@
-# PROYECTO BASE: [Nombre de la Aplicación] - Software Factory SENA
+# Sistema de Gestión de Tareas — Software Factory SENA
 
-**Metodología:** *"Del Requerimiento al Producto"*
-
-Este repositorio constituye la base técnica y administrativa para el desarrollo del proyecto. No es solo un contenedor de código, es una simulación de un entorno profesional donde se aplican estándares de calidad, gestión ágil y flujos de trabajo colaborativos reales.
-
----
-
-## INTRODUCCIÓN Y PROPÓSITO
-
-El objetivo de este proyecto es desarrollar una solución tecnológica funcional, priorizando:
-
-- Arquitectura limpia  
-- Código escalable  
-- Trazabilidad total  
-
-### El "Por qué" (Justificación)
-
-Dominar el ciclo de vida del software es tan importante como programar. Esta metodología alinea las habilidades técnicas con las exigencias de la industria, garantizando que cada línea de código tenga un propósito claro y demostrable.
+**Metodología:** *"Del Requerimiento al Producto"*  
+**Programa:** Técnico en Programación de Software — Código 3233198  
+**Instructor:** John Freddy Becerra Castellanos  
 
 ---
 
-## CENTRO DE DOCUMENTACIÓN (WIKI DEL PROYECTO)
+## Equipo
 
-Antes de escribir la primera línea de código o ejecutar un comando, es obligatorio revisar las guías de trabajo.
-
-### Nivel 1. Sistema  
-**Ubicación:** `docs/01-guia-sistema/`  
-- Manuales técnicos: creación de Issues y Milestones  
-
-### Nivel 2. Metodología  
-**Ubicación:** `docs/02-guia-metodologia/`  
-- Reglas para reportar tareas y solicitar revisiones (PR)  
-
-### Nivel 3. Formatos  
-**Ubicación:** `docs/03-formatos-maestros/`  
-- Plantillas oficiales de documentos  
+| Nombre | Rol | Rama | Usuario de GitHub |
+|:---|:---|:---|:---|
+| Karol Nicolle Torres Fuentes | Líder (Arquitecto) | `desarrolladora` | `@Karolatf` |
+| Sebastián Patiño | Desarrollador | `developer` | `@SebasPatino` |
+| Paulo Zapata | Desarrollador | `desarrollador` | `@Pauloz17` |
 
 ---
 
-## ROLES DE LA CÉLULA ÁGIL
+## Descripción del Proyecto
 
-### Líder (Arquitecto)
+Aplicación web full-stack para gestionar tareas por usuario. Implementa un CRUD completo con arquitectura en capas, panel de administración, vista de usuario y backend REST con Node.js y MySQL.
 
-- **Responsabilidad:** Integridad del repositorio y control de calidad  
-- **Tareas en GitHub:**
-  - Protección de ramas  
-  - Gestión de Milestones  
-  - Aprobación de Pull Requests  
+El sistema tiene dos repositorios:
 
----
-
-### Desarrollador (Albañil)
-
-- **Responsabilidad:** Construcción de módulos y lógica  
-- **Tareas en GitHub:**
-  - Desarrollo en ramas `feat/`  
-  - Reporte de avances  
-  - Solicitud de revisión técnica  
+- **`transferencia_dom_parejas`** — Frontend modularizado con Vite y Vanilla JS
+- **`servidor_backend_parejas`** — Backend REST con Node.js, Express y MySQL
 
 ---
 
-### El "Por qué"
+## Repositorio 1: Frontend (`transferencia_dom_parejas`)
 
-La división de roles evita duplicidad de tareas y establece una jerarquía clara de responsabilidad (segregación de funciones), esencial en equipos de alto rendimiento.
+### Tecnologías
 
----
+- Vite (empaquetador)
+- Vanilla JavaScript con ES Modules
+- SweetAlert2 (notificaciones y confirmaciones)
+- CSS con variables personalizadas
 
-## CONFIGURACIÓN DEL ENTORNO (LOCAL)
+### Arquitectura en capas
 
-Para estandarizar el desarrollo y evitar errores de compatibilidad, sigue estos pasos en tu terminal:
+```
+src/
+├── api/
+│   ├── tareasApi.js        ← peticiones HTTP de tareas (GET, POST, PATCH, DELETE)
+│   └── usuariosApi.js      ← peticiones HTTP de usuarios (GET, POST, PUT, DELETE)
+├── services/
+│   └── tareasService.js    ← lógica intermedia entre API y UI (modo usuario)
+├── ui/
+│   ├── tareasUI.js         ← manipulación del DOM: tabla, modal de edición
+│   ├── modoUI.js           ← navegación entre vistas y panel admin
+│   ├── adminPanel.js       ← panel de administración con CRUD de usuarios
+│   └── buscarUsuario.js    ← vista de búsqueda por documento
+└── utils/
+    ├── config.js           ← URL base del servidor (API_BASE_URL)
+    ├── validaciones.js     ← validación de formularios
+    ├── notificaciones.js   ← toasts y diálogos con SweetAlert2
+    ├── filtros.js          ← filtrado puro de tareas
+    ├── ordenamiento.js     ← ordenamiento puro de tareas
+    └── exportacion.js      ← exportación a JSON descargable
+```
+
+### Vistas del sistema
+
+**Pantalla de inicio** — Dos tarjetas de acceso: Usuario y Administrador, con fondo degradado y efecto glass.
+
+**Vista Usuario** — El usuario busca por número de documento, ve sus tareas asignadas en tabla con estado y comentario, y puede editar o eliminar tareas propias con confirmación SweetAlert2.
+
+**Vista Administrador** — Panel completo con búsqueda en el header, tabla de usuarios con botones "Ver / Asignar" y "Eliminar", tabla de todas las tareas con filtros por estado y usuario, exportación a JSON, y modal dinámico para asignar tareas a usuarios específicos.
+
+### Reglas de arquitectura
+
+- La UI **nunca** llama directamente a la API — todo pasa por el service
+- Ningún módulo usa `innerHTML` ni atributos `style` en JavaScript
+- Las variables globales están prohibidas — se usan ES Modules con `export`/`import`
+- Comentarios en español, código en inglés con `camelCase`
+
+### Cómo ejecutar
 
 ```bash
-# Paso 1. Clonar el repositorio
-git clone [URL-del-repositorio-grupal]
-
-# Paso 2. Instalar dependencias
+# Instalar dependencias
 npm install
 
-# Paso 3. Ejecutar el servidor local
+# Modo desarrollo (http://localhost:5173)
+npm run dev
+
+# Build de producción
+npm run build
+
+# Vista previa del build
+npm run preview
+```
+
+> El servidor backend debe estar corriendo en `http://localhost:3000` antes de iniciar el frontend.
+
+---
+
+## Repositorio 2: Backend (`servidor_backend_parejas`)
+
+### Tecnologías
+
+- Node.js (ES Modules)
+- Express.js v5
+- MySQL 2 con pool de conexiones
+- Nodemon (desarrollo)
+- dotenv (variables de entorno)
+
+### Arquitectura MVC
+
+```
+src/
+├── database/
+│   └── connection.js       ← pool de conexiones MySQL con dotenv
+├── models/
+│   ├── userModel.js        ← CRUD sobre la tabla users en MySQL
+│   └── taskModel.js        ← CRUD sobre la tabla tasks en MySQL
+├── controller/
+│   ├── users.controller.js ← recibe req/res, llama al modelo de usuarios
+│   └── tasks.controller.js ← recibe req/res, llama al modelo de tareas
+├── routes/
+│   ├── userRoutes.js       ← conecta endpoints /api/users con el controlador
+│   └── taskRoutes.js       ← conecta endpoints /api/tasks con el controlador
+└── app.js                  ← instancia de Express, CORS, registro de rutas
+```
+
+### Variables de entorno
+
+Crear un archivo `.env` en la raíz del repositorio backend:
+
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=app_user
+DB_PASSWORD=TU_CONTRASEÑA
+DB_NAME=gestion_tareas_sena
+```
+
+### Configuración de MySQL
+
+Ejecutar como root en MySQL Workbench:
+
+```sql
+CREATE DATABASE IF NOT EXISTS gestion_tareas_sena;
+CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TU_CONTRASEÑA';
+GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Luego ejecutar `database/schema.sql` con la conexión `app_user` para crear las tablas e insertar los usuarios iniciales.
+
+### Cómo ejecutar
+
+```bash
+# Instalar dependencias
+npm install
+
+# Modo desarrollo con nodemon (http://localhost:3000)
 npm run dev
 ```
 
-### El "por que"
+---
 
-Estandarizar el entorno asegura la paridad entre las máquinas de todos los colaboradores, erradicando para siempre la excusa de "en mi máquina sí funciona".
+## Endpoints del Backend
 
-## ARQUITECTURA Y ESTRUCTURA DEL PROYECTO
+### Usuarios — `/api/users`
 
-Mantenemos una organización modular para facilitar el mantenimiento:
+| Método | Ruta | Descripción |
+|:---|:---|:---|
+| GET | `/api/users` | Listar todos los usuarios |
+| GET | `/api/users/:id` | Obtener un usuario por id |
+| POST | `/api/users` | Crear un usuario nuevo |
+| PUT | `/api/users/:id` | Actualizar un usuario |
+| DELETE | `/api/users/:id` | Eliminar un usuario |
+| GET | `/api/users/:userId/tasks` | Tareas asignadas a un usuario |
 
+**Cuerpo para POST `/api/users`:**
+```json
+{
+  "documento": "1097497124",
+  "name": "Nombre Apellido",
+  "email": "correo@ejemplo.com"
+}
 ```
-/
-├── .github/              # Motor de plantillas (Issues y Pull Requests)
-├── docs/                 # Guías metodológicas y reportes técnicos
-├── public/               # Recursos estáticos (imágenes, iconos)
-├── src/                  # Código fuente principal
-│   ├── assets/           # Estilos globales y multimedia
-│   ├── components/       # Piezas de interfaz reutilizables (UI)
-│   ├── services/         # Lógica de consumo de datos o APIs
-│   ├── views/            # Secciones o páginas principales
-│   └── main.js           # Punto de entrada de la aplicación
-├── .gitignore            # Archivos que Git debe ignorar
-├── package.json          # Dependencias y scripts del proyecto
-├── README.md             # Manual principal del repositorio
-└── TEAM_AGREEMENT.md     # Acuerdo y normas de convivencia del equipo
+
+### Tareas — `/api/tasks`
+
+| Método | Ruta | Descripción |
+|:---|:---|:---|
+| GET | `/api/tasks` | Listar todas las tareas |
+| GET | `/api/tasks/filter` | Filtrar por estado o usuario |
+| GET | `/api/tasks/dashboard` | Estadísticas generales |
+| GET | `/api/tasks/:id` | Obtener una tarea por id |
+| POST | `/api/tasks` | Crear una tarea nueva |
+| PUT | `/api/tasks/:id` | Actualizar una tarea |
+| DELETE | `/api/tasks/:id` | Eliminar una tarea |
+| PATCH | `/api/tasks/:id/status` | Cambiar el estado de una tarea |
+| POST | `/api/tasks/:taskId/assign` | Asignar usuarios a una tarea |
+| GET | `/api/tasks/:taskId/users` | Ver usuarios asignados a una tarea |
+| DELETE | `/api/tasks/:taskId/users/:userId` | Quitar un usuario de una tarea |
+
+**Cuerpo para POST `/api/tasks`:**
+```json
+{
+  "title": "Título de la tarea",
+  "description": "Descripción detallada",
+  "status": "pendiente",
+  "assignedUsers": [1, 2]
+}
 ```
 
-## METODOLOGÍA DE TRABAJO (GITFLOW PROFESIONAL)
+**Query params para GET `/api/tasks/filter`:**
+```
+?status=pendiente
+?userId=1
+?status=en_progreso&userId=2
+```
 
-El flujo de trabajo es el corazón de nuestra colaboración.  
-Está estrictamente prohibido hacer commits directos sobre las ramas `main` o `develop`.
+**Valores válidos para `status`:** `pendiente` | `en_progreso` | `completada`
 
 ---
 
-### Paso 1. Sincronizar
-Trae los últimos cambios aprobados del equipo:
+## Flujo de Datos
 
-```bash
-git checkout develop
-git pull origin develop
 ```
-### Paso 2. Rama de Tarea
-
-Crea un espacio aislado para tu requerimiento:
-
-```bash
-git checkout -b feat/nombre-tarea
+Usuario (evento DOM)
+        ↓
+  tareasService.js  ←→  utils/ (validaciones, notificaciones, filtros, ordenamiento)
+        ↓
+    api/*.js  (tareasApi.js / usuariosApi.js)
+        ↓
+  GET/POST/PUT/PATCH/DELETE http://localhost:3000
+        ↓
+    app.js (Express)
+        ↓
+    routes/ (userRoutes.js / taskRoutes.js)
+        ↓
+    controller/ (users.controller.js / tasks.controller.js)
+        ↓
+    models/ (userModel.js / taskModel.js)
+        ↓
+    MySQL — base de datos gestion_tareas_sena
 ```
-
-### Paso 3. Desarrollo
-
-Escribe código limpio y realiza commits descriptivos.
-
-### Paso 4. Sincronización Final
-
-Antes de entregar, integra los cambios recientes del equipo para resolver conflictos en tu máquina:
-
-```bash
-git checkout develop
-git pull origin develop
-git checkout feat/nombre-tarea
-git merge develop
-```
-
-### Paso 5. Solicitud de PR
-
-Sube tu rama y solicita la revisión técnica en GitHub:
-
-```bash
-git push origin feat/nombre-tarea
-```
-
-### El "Por qué"
-
-Este flujo protege la estabilidad del código base. Si tu código falla, solo falla en tu rama, manteniendo el proyecto principal intacto y siempre funcional.
-
-## BLINDAJE DE RAMAS Y SEGURIDAD
-
-Para garantizar la integridad del producto, el repositorio cuenta con candados de seguridad:
-
-- **Rama `main`:**
-  - Representa el estado de producción  
-  - Solo recibe código desde `develop` cuando un Milestone (Hito) está al 100%  
-
-- **Restricción de Merge:**
-  - El botón de integración está bloqueado para los desarrolladores  
-  - Solo el Líder tiene el permiso final tras la revisión  
 
 ---
 
-## ESTÁNDARES DE CALIDAD (DEFINITION OF DONE)
+## Estructura de Ramas
 
-Antes de que el Líder apruebe un Pull Request, el desarrollador debe garantizar:
+```
+main          ← producción (solo Karol mergea, con tag de versión)
+  └── release ← integración (todos hacen PR aquí)
+        ├── desarrolladora  ← rama de Karol
+        ├── developer       ← rama de Sebastián
+        └── desarrollador   ← rama de Paulo
+```
 
-- **Limpieza:**  
-  Cero `console.log`, variables sin uso o código comentado (*"por si acaso"*)  
-
-- **Responsive:**  
-  El diseño se adapta sin romperse a pantallas móviles  
-
-- **Sincronización:**  
-  La rama está actualizada y sin conflictos de merge  
-
-- **Automatización:**  
-  La descripción del PR incluye `Closes #ID` para cerrar la tarea  
-
-### El "Por qué"
-
-Un control de calidad preventivo reduce la deuda técnica (errores acumulados) y automatiza el proceso administrativo.
+**Regla de oro:** ningún commit va directo a `main` ni a `release`. Todo entra por Pull Request con al menos una aprobación del líder.
 
 ---
 
-## CRITERIOS DE ENTREGA Y EVALUACIÓN
+## Historial de Versiones
 
-La fase del proyecto se considera exitosa, terminada y lista para calificación únicamente cuando:
+### Frontend (transferencia_dom)
 
-- El **Milestone** en GitHub marca el **100%** de progreso  
-- Todas las **Issues** del hito están cerradas y vinculadas a un PR aprobado  
-- El proyecto está desplegado en vivo (ej. Vercel, GitHub Pages) y funciona sin errores  
-
-### El "Por qué"
-
-En la industria, el software que no está publicado no existe. Esto vincula el resultado técnico con la gestión profesional.
-
----
-
-## DIRECCIÓN DEL PROYECTO
-
-- **Instructor:** [Tu Nombre Aquí]  
-- **Institución:** Servicio Nacional de Aprendizaje (SENA)  
-- **Centro:** [Nombre de tu Centro de Formación]  
-- **Programa:** Análisis y Desarrollo de Software  
+| Tag   | Descripción |
+|:------|:------------|
+| v1.0.0 | Implementación completa (filtros, ordenamiento, notificaciones y exportación JSON) |
+| v2.0.0 | Migración a entorno con Vite y configuración de build |
+| v2.1.0 | Integración SweetAlert2 (reemplazo de diálogos nativos) |
+| v2.1.1 | Documentación técnica del versionado + configuración de gitignore y limpieza del proyecto |
+| v3.0.0 | Sistema completo con panel admin, backend Express, modelos dinámicos y CRUD con SweetAlert2 |
+| v3.1.0 | Rediseño de pantalla de inicio + validaciones en formulario admin + SweetAlert2 completo |
 
 ---
 
-Este repositorio es propiedad del equipo de desarrollo y se rige por las políticas de formación profesional integral del SENA.
+### Backend (servidor_backend_parejas)
+
+| Tag   | Descripción |
+|:------|:------------|
+| v1.0.0 | Modelos, controladores y rutas base |
+| v1.1.0 | Implementación de subida de archivos + ajustes faltantes |
+
+---
+
+## Guías del Proyecto
+
+La carpeta `docs/` contiene las guías metodológicas del proyecto:
+
+- `docs/01-guia-sistema/` — Gestión de Issues, Milestones y tablero Kanban
+- `docs/02-guia-metodologia/` — GitFlow, commits convencionales, Pull Requests
+- `docs/03-formatos-maestros/` — Plantillas oficiales de Issues y PRs
+
+---
+
+## Criterios de Entrega
+
+La fase se considera terminada cuando:
+
+- El **Milestone** en GitHub marca **100%** de progreso
+- Todas las Issues del hito están cerradas y vinculadas a un PR aprobado
+- El sistema corre sin errores con `npm run dev` en ambos repositorios
+- El backend conecta correctamente con MySQL y responde a todos los endpoints
+
+---
+
+
 ## Base de Datos
 
 Este proyecto usa **MySQL 8.0** para la persistencia de datos.
@@ -236,3 +323,6 @@ CREATE DATABASE IF NOT EXISTS gestion_tareas_sena;
 CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TORRES_2007';
 GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
 FLUSH PRIVILEGES;
+```
+
+*Servicio Nacional de Aprendizaje (SENA) · Técnico en Programación de Software · 2026*
