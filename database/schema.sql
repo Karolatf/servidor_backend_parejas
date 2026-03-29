@@ -31,11 +31,13 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- tabla de tareas
 -- assigned_users: arreglo de IDs guardado como JSON (sin FK externa)
+-- comment: campo opcional para que el usuario anote observaciones sobre la tarea
 CREATE TABLE IF NOT EXISTS tasks (
     id              INT          NOT NULL AUTO_INCREMENT,
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
     status          VARCHAR(20)  NOT NULL DEFAULT 'pendiente',
+    comment         TEXT         NULL,
     assigned_users  JSON         NOT NULL DEFAULT (JSON_ARRAY()),
     created_ud      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_up      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
