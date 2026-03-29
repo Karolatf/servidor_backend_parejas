@@ -65,20 +65,24 @@ export async function getAllTasks() {
     // Se obtienen todas las tareas de la tabla tasks
     const [rows]     = await pool.query('SELECT * FROM tasks');
     // Se obtienen todos los usuarios para resolver los IDs a nombres
-    const [usuarios] = await pool.query('SELECT id, name FROM users');
+    const [usuarios] = await pool.query('SELECT id, name, documento FROM users');
 
     return rows.map(function(fila) {
         const tarea   = formatearTarea(fila);
 
-        // Se recorre assignedUsers y se busca el nombre de cada id en el arreglo de usuarios
         const nombres = tarea.assignedUsers.map(function(id) {
             const encontrado = usuarios.find(u => u.id === Number(id));
             return encontrado ? encontrado.name : null;
-        }).filter(Boolean); // filter(Boolean) elimina los null (ids que ya no existen)
+        }).filter(Boolean);
 
-        // assignedUsersDisplay: string con los nombres separados por coma,
-        // o null si no hay usuarios asignados (el frontend muestra 'Sin asignar')
         tarea.assignedUsersDisplay = nombres.length > 0 ? nombres.join(', ') : null;
+
+        // assignedDocumentos: permite filtrar por documento en el panel admin
+        tarea.assignedDocumentos = tarea.assignedUsers.map(function(id) {
+            const encontrado = usuarios.find(u => u.id === Number(id));
+            return encontrado ? encontrado.documento.toString() : null;
+        }).filter(Boolean);
+
         return tarea;
     });
 }

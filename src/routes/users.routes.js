@@ -20,6 +20,7 @@ import { Router } from 'express';
 import {
     getUsers,
     getUserById,
+    getUserByDocumento,
     createUser,
     updateUser,
     deleteUser,
@@ -38,6 +39,11 @@ router.get('/', getUsers);
 router.post('/', createUser);
 
 // ── RUTAS CON SEGMENTO FIJO AL FINAL (van ANTES de /:id) ─────────────────────
+
+// GET /api/users/by-document/:documento — busca un usuario por su número de documento.
+// CRÍTICO: va ANTES de /:id para que Express no interprete "by-document" como un id.
+// El frontend lo usa en el modo usuario para buscar por documento sin traer todos los usuarios.
+router.get('/by-document/:documento', getUserByDocumento);
 
 // GET /api/users/:userId/tasks — retorna todas las tareas asignadas a un usuario.
 // CORRECCIÓN: esta ruta va ANTES de /:id para que Express no interprete

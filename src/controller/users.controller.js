@@ -6,10 +6,11 @@
 
 import {
     getAllUsers,
-    getUserById    as findUserById,
-    createUser     as insertUser,
-    updateUser     as modifyUser,
-    deleteUser     as removeUser
+    getUserById         as findUserById,
+    getUserByDocumento  as findUserByDocumento,
+    createUser          as insertUser,
+    updateUser          as modifyUser,
+    deleteUser          as removeUser
 } from '../models/user.model.js';
 
 import { getTasksByUserId } from '../models/task.model.js';
@@ -99,6 +100,25 @@ export async function deleteUser(req, res) {
     } catch (error) {
         console.error('Error en deleteUser:', error);
         res.status(500).json({ error: 'Error al eliminar el usuario' });
+    }
+}
+
+// GET /api/users/by-document/:documento
+// Busca un usuario por su número de documento — usado por el frontend para el modo usuario
+// Va ANTES de /:id en las rutas para que Express no capture "by-document" como id
+export async function getUserByDocumento(req, res) {
+    try {
+        const { documento } = req.params;
+        const usuario = await findUserByDocumento(documento);
+
+        if (!usuario) {
+            return res.status(404).json({ error: `No existe un usuario con el documento ${documento}` });
+        }
+
+        res.status(200).json(usuario);
+    } catch (error) {
+        console.error('Error en getUserByDocumento:', error);
+        res.status(500).json({ error: 'Error al buscar el usuario por documento' });
     }
 }
 
