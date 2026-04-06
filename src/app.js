@@ -7,6 +7,7 @@ import './database/db.connection.js';
 import express from 'express';
 import cors from 'cors';
 
+import { errorMiddleware } from './middlewares/error.middleware.js';
 import usersRouter from './routes/users.routes.js';
 import tasksRouter from './routes/tasks.routes.js';
 
@@ -35,6 +36,10 @@ app.use('/api/users', usersRouter);
 
 // rutas de tareas: GET/POST/PUT/PATCH/DELETE /api/tasks
 app.use('/api/tasks', tasksRouter);
+
+// Middleware global de errores — debe registrarse DESPUÉS de todas las rutas
+// Si se registra antes, los errores de las rutas no llegarán aquí
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en http://localhost:${PORT}`);

@@ -1,8 +1,18 @@
 // MÓDULO: controller/users.controller.js
 // CAPA: Controlador (recibe HTTP, llama el modelo, responde HTTP)
-
+//
 // Responsabilidad única: manejar las peticiones HTTP de usuarios.
 // NUNCA maneja datos directamente — solo recibe req, llama el modelo y responde res.
+//
+// REFACTORIZACIÓN APLICADA:
+//   Se eliminaron todos los bloques try/catch manuales y las líneas
+//   res.status().json() directas. Ahora se usan:
+//   - catchAsync: para capturar errores async automáticamente
+//   - successResponse: para respuestas exitosas con formato estándar
+//   - errorResponse: para respuestas de error con formato estándar
+
+import { catchAsync }                     from '../utils/catchAsync.js';
+import { successResponse, errorResponse } from '../utils/response.util.js';
 
 import {
     getAllUsers,
@@ -16,121 +26,97 @@ import {
 import { getTasksByUserId } from '../models/task.model.js';
 
 // GET /api/users
-// Retorna todos los usuarios
-export async function getUsers(req, res) {
-    try {
-        const usuarios = await getAllUsers();
-        res.status(200).json(usuarios);
-    } catch (error) {
-        console.error('Error en getUsers:', error);
-        res.status(500).json({ error: 'Error al obtener los usuarios' });
-    }
-}
+// Retorna todos los usuarios con el formato estándar { success, message, data }
+export const getUsers = catchAsync(async (req, res) => {
+    const usuarios = await getAllUsers();
+    return successResponse(res, 'Usuarios obtenidos correctamente', usuarios);
+});
 
 // GET /api/users/:id
-// Retorna un usuario por su id
-export async function getUserById(req, res) {
-    try {
-        const { id } = req.params;
-        const usuario = await findUserById(id);
+// Retorna un usuario por su id o 404 si no existe
+export const getUserById = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const usuario = await findUserById(id);
 
-        if (!usuario) {
-            return res.status(404).json({ error: `Usuario con id ${id} no encontrado` });
-        }
-
-        res.status(200).json(usuario);
-    } catch (error) {
-        console.error('Error en getUserById:', error);
-        res.status(500).json({ error: 'Error al obtener el usuario' });
+    if (!usuario) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
     }
-}
+
+    return successResponse(res, 'Usuario encontrado', usuario);
+});
 
 // POST /api/users
 // Crea un usuario nuevo
-// Cuerpo: { documento, name, email }
-export async function createUser(req, res) {
-    try {
-        const { documento, name, email } = req.body;
+// Cuerpo esperado: { documento, name, email }
+export const createUser = catchAsync(async (req, res) => {
+    const { documento, name, email } = req.body;
 
-        if (!documento || !name || !email) {
-            return res.status(400).json({ error: 'Los campos documento, name y email son obligatorios' });
-        }
-
-        const nuevoUsuario = await insertUser({ documento, name, email });
-        res.status(201).json(nuevoUsuario);
-    } catch (error) {
-        console.error('Error en createUser:', error);
-        res.status(500).json({ error: 'Error al crear el usuario' });
+    // Se valida que los tres campos obligatorios estén presentes
+    if (!documento || !name || !email) {
+        return errorResponse(
+            res,
+            'Los campos documento, name y email son obligatorios',
+            400
+        );
     }
-}
+
+    const nuevoUsuario = await insertUser({ documento, name, email });
+    return successResponse(res, 'Usuario creado correctamente', nuevoUsuario, 201);
+});
 
 // PUT /api/users/:id
 // Actualiza los datos de un usuario existente
 // El modelo solo permite actualizar: documento, name, email
-export async function updateUser(req, res) {
-    try {
-        const { id } = req.params;
-        const campos = req.body;
+export const updateUser = catchAsync(async (req, res) => {
+    const { id }             = req.params;
+    const campos             = req.body;
+    const usuarioActualizado = await modifyUser(id, campos);
 
-        const usuarioActualizado = await modifyUser(id, campos);
-
-        if (!usuarioActualizado) {
-            return res.status(404).json({ error: `Usuario con id ${id} no encontrado` });
-        }
-
-        res.status(200).json(usuarioActualizado);
-    } catch (error) {
-        console.error('Error en updateUser:', error);
-        res.status(500).json({ error: 'Error al actualizar el usuario' });
+    if (!usuarioActualizado) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
     }
-}
+
+    return successResponse(res, 'Usuario actualizado correctamente', usuarioActualizado);
+});
 
 // DELETE /api/users/:id
-// Elimina un usuario
-export async function deleteUser(req, res) {
-    try {
-        const { id } = req.params;
-        const usuarioEliminado = await removeUser(id);
+// Elimina un usuario y retorna confirmación
+export const deleteUser = catchAsync(async (req, res) => {
+    const { id }           = req.params;
+    const usuarioEliminado = await removeUser(id);
 
-        if (!usuarioEliminado) {
-            return res.status(404).json({ error: `Usuario con id ${id} no encontrado` });
-        }
-
-        res.status(200).json({ mensaje: `Usuario "${usuarioEliminado.name}" eliminado correctamente` });
-    } catch (error) {
-        console.error('Error en deleteUser:', error);
-        res.status(500).json({ error: 'Error al eliminar el usuario' });
+    if (!usuarioEliminado) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
     }
-}
+
+    return successResponse(
+        res,
+        `Usuario "${usuarioEliminado.name}" eliminado correctamente`
+    );
+});
 
 // GET /api/users/by-document/:documento
-// Busca un usuario por su número de documento — usado por el frontend para el modo usuario
+// Busca un usuario por su número de documento
 // Va ANTES de /:id en las rutas para que Express no capture "by-document" como id
-export async function getUserByDocumento(req, res) {
-    try {
-        const { documento } = req.params;
-        const usuario = await findUserByDocumento(documento);
+export const getUserByDocumento = catchAsync(async (req, res) => {
+    const { documento } = req.params;
+    const usuario       = await findUserByDocumento(documento);
 
-        if (!usuario) {
-            return res.status(404).json({ error: `No existe un usuario con el documento ${documento}` });
-        }
-
-        res.status(200).json(usuario);
-    } catch (error) {
-        console.error('Error en getUserByDocumento:', error);
-        res.status(500).json({ error: 'Error al buscar el usuario por documento' });
+    if (!usuario) {
+        return errorResponse(
+            res,
+            `No existe un usuario con el documento ${documento}`,
+            404
+        );
     }
-}
+
+    return successResponse(res, 'Usuario encontrado', usuario);
+});
 
 // GET /api/users/:userId/tasks
 // Retorna todas las tareas asignadas a un usuario específico
-export async function getUserTasks(req, res) {
-    try {
-        const { userId } = req.params;
-        const tareas = await getTasksByUserId(userId);
-        res.status(200).json(tareas);
-    } catch (error) {
-        console.error('Error en getUserTasks:', error);
-        res.status(500).json({ error: 'Error al obtener las tareas del usuario' });
-    }
-}
+export const getUserTasks = catchAsync(async (req, res) => {
+    const { userId } = req.params;
+    const tareas     = await getTasksByUserId(userId);
+    return successResponse(res, 'Tareas del usuario obtenidas correctamente', tareas);
+});
