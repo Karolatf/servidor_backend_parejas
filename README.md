@@ -39,24 +39,31 @@ El sistema tiene dos repositorios:
 ### Arquitectura en capas
 
 ```
-src/
-├── api/
-│   ├── tareasApi.js        ← peticiones HTTP de tareas (GET, POST, PATCH, DELETE)
-│   └── usuariosApi.js      ← peticiones HTTP de usuarios (GET, POST, PUT, DELETE)
-├── services/
-│   └── tareasService.js    ← lógica intermedia entre API y UI (modo usuario)
-├── ui/
-│   ├── tareasUI.js         ← manipulación del DOM: tabla, modal de edición
-│   ├── modoUI.js           ← navegación entre vistas y panel admin
-│   ├── adminPanel.js       ← panel de administración con CRUD de usuarios
-│   └── buscarUsuario.js    ← vista de búsqueda por documento
-└── utils/
-    ├── config.js           ← URL base del servidor (API_BASE_URL)
-    ├── validaciones.js     ← validación de formularios
-    ├── notificaciones.js   ← toasts y diálogos con SweetAlert2
-    ├── filtros.js          ← filtrado puro de tareas
-    ├── ordenamiento.js     ← ordenamiento puro de tareas
-    └── exportacion.js      ← exportación a JSON descargable
+servidor_backend_parejas/
+├── database/
+│   ├── connection.sql   ← NUEVO: crea la BD y el usuario de conexión (ejecutar con root)
+│   └── schema.sql       ← tablas e inserts (ejecutar con app_user)
+├── md/                  ← NUEVO: documentación técnica del proyecto
+│   ├── asignaciones_1/
+│   │   ├── asignacion_karol.md
+│   │   ├── asignacion_paulo.md
+│   │   └── asignacion_sebastian.md
+│   ├── analisisTecnico.md
+│   ├── analisisRedundancia.md
+│   ├── infoTecBackend.md
+│   └── informeBackend.md
+├── src/
+│   ├── app.js
+│   ├── controller/
+│   ├── database/
+│   ├── middlewares/
+│   ├── models/
+│   ├── routes/
+│   └── utils/
+├── docs/           ← solo guías del sistema y metodología del equipo
+├── postman/
+├── .env
+└── package.json
 ```
 
 ### Vistas del sistema
