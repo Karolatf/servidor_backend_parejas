@@ -50,13 +50,9 @@ export const getTaskById = catchAsync(async (req, res) => {
 // POST /api/tasks
 // Crea una tarea nueva
 // Cuerpo esperado: { title, description, status, assignedUsers }
+// NOTA: la validación la realiza validateSchema(createTaskSchema) antes de llegar aquí.
 export const createTask = catchAsync(async (req, res) => {
     const { title, description, status, assignedUsers } = req.body;
-
-    // El título es el único campo obligatorio para crear una tarea
-    if (!title) {
-        return errorResponse(res, 'El campo title es obligatorio', 400);
-    }
 
     const nuevaTarea = await insertTask({ title, description, status, assignedUsers });
     return successResponse(res, 'Tarea creada correctamente', nuevaTarea, 201);
@@ -95,18 +91,10 @@ export const deleteTask = catchAsync(async (req, res) => {
 // PATCH /api/tasks/:id/status
 // Cambia solo el estado de una tarea
 // Cuerpo esperado: { status: 'pendiente' | 'en_progreso' | 'completada' }
+// NOTA: la validación del enum la realiza validateSchema(updateTaskStatusSchema).
 export const updateTaskStatus = catchAsync(async (req, res) => {
     const { id }     = req.params;
     const { status } = req.body;
-
-    const estadosValidos = ['pendiente', 'en_progreso', 'completada'];
-    if (!status || !estadosValidos.includes(status)) {
-        return errorResponse(
-            res,
-            `Estado inválido. Valores permitidos: ${estadosValidos.join(', ')}`,
-            400
-        );
-    }
 
     const tareaActualizada = await changeStatus(id, status);
 
@@ -120,17 +108,10 @@ export const updateTaskStatus = catchAsync(async (req, res) => {
 // POST /api/tasks/:taskId/assign
 // Asigna usuarios a una tarea
 // Cuerpo esperado: { userIds: [1, 2, 3] }
+// NOTA: la validación del arreglo la realiza validateSchema(assignUsersSchema).
 export const assignUsersToTask = catchAsync(async (req, res) => {
     const { taskId }  = req.params;
     const { userIds } = req.body;
-
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-        return errorResponse(
-            res,
-            'Se requiere un arreglo userIds con al menos un id',
-            400
-        );
-    }
 
     const tareaActualizada = await addUsersToTask(taskId, userIds);
 
