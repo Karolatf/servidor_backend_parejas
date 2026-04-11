@@ -48,18 +48,11 @@ export const getUserById = catchAsync(async (req, res) => {
 // POST /api/users
 // Crea un usuario nuevo
 // Cuerpo esperado: { documento, name, email }
+// NOTA: la validación de campos obligatorios y formatos la realiza
+// el middleware validateSchema(createUserSchema) antes de llegar aquí.
+// El controlador solo recibe datos ya validados y limpios.
 export const createUser = catchAsync(async (req, res) => {
     const { documento, name, email } = req.body;
-
-    // Se valida que los tres campos obligatorios estén presentes
-    if (!documento || !name || !email) {
-        return errorResponse(
-            res,
-            'Los campos documento, name y email son obligatorios',
-            400
-        );
-    }
-
     const nuevoUsuario = await insertUser({ documento, name, email });
     return successResponse(res, 'Usuario creado correctamente', nuevoUsuario, 201);
 });
