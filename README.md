@@ -212,6 +212,9 @@ npm run dev
   "status": "pendiente",
   "assignedUsers": [1, 2]
 }
+
+**Nota:** El campo `assignedUsers` es un array de IDs numéricos de usuarios. En la arquitectura actual, este campo es gestionado por el frontend desde el panel de administración al crear o asignar tareas. Al consumir este endpoint directamente (por ejemplo desde Postman), se puede enviar vacío `[]` o con los IDs deseados.
+
 ```
 
 **Query params para GET `/api/tasks/filter`:**
