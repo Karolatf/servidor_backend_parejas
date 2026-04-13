@@ -6,9 +6,24 @@
 // Este archivo NO toca el DOM, NO hace peticiones HTTP, NO accede a la BD.
 //
 // Se usa Zod como librería estándar de validación de esquemas.
-// Zod permite definir el molde una vez y reutilizarlo en múltiples rutas.
+//
+// ACTUALIZACIÓN v3.2.0:
+//   Se agrega "pendiente_aprobacion" como cuarto estado válido del sistema.
+//   Lo pone el usuario cuando considera que terminó su tarea y necesita
+//   que el admin la revise antes de marcarla como completada.
+//   Los cuatro estados siguen el flujo de trabajo del proyecto:
+//     pendiente → en_progreso → pendiente_aprobacion → completada
 
 import { z } from 'zod';
+
+// Lista centralizada de estados válidos del sistema.
+// Se define aquí para reutilizarla en los tres schemas sin repetirla.
+const ESTADOS_VALIDOS = [
+    'pendiente',
+    'en_progreso',
+    'pendiente_aprobacion',
+    'completada',
+];
 
 // Esquema para CREAR una tarea — POST /api/tasks
 // Define qué campos son obligatorios y qué restricciones tiene cada uno
@@ -18,27 +33,27 @@ export const createTaskSchema = z.object({
     // Evita que se creen tareas sin nombre o con nombres sin sentido
     title: z
         .string({
-            required_error:   'El título de la tarea es obligatorio',
+            required_error:     'El título de la tarea es obligatorio',
             invalid_type_error: 'El título debe ser una cadena de texto',
         })
         .min(3,   'El título debe tener al menos 3 caracteres')
         .max(200, 'El título no puede exceder los 200 caracteres'),
 
     // description: opcional — puede no venir en el body
-    // Si viene, no puede estar vacío ni superar 500 caracteres
+    // Si viene, no puede superar 500 caracteres
     description: z
         .string({ invalid_type_error: 'La descripción debe ser una cadena de texto' })
         .max(500, 'La descripción no puede exceder los 500 caracteres')
         .optional(),
 
-    // status: obligatorio, solo acepta los tres valores del sistema
-    // Evita que se guarden estados inventados como "activo" o "done"
+    // status: obligatorio, solo acepta los cuatro valores del sistema
+    // ACTUALIZACIÓN: se agrega "pendiente_aprobacion" como cuarto estado
     status: z.enum(
-        ['pendiente', 'en_progreso', 'completada'],
+        ESTADOS_VALIDOS,
         {
-            required_error:   'El estado de la tarea es obligatorio',
+            required_error:     'El estado de la tarea es obligatorio',
             invalid_type_error: 'El estado debe ser una cadena de texto',
-            message:          "El estado debe ser: 'pendiente', 'en_progreso' o 'completada'",
+            message:            "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion' o 'completada'",
         }
     ),
 
@@ -63,17 +78,17 @@ export const createTaskSchema = z.object({
 
 // Esquema para ACTUALIZAR una tarea completa — PUT /api/tasks/:id
 // Igual que createTaskSchema pero todos los campos son opcionales (partial)
-// Esto permite actualizar solo los campos que se envíen sin obligar a enviar todos
 export const updateTaskSchema = createTaskSchema.partial();
 
 // Esquema para CAMBIAR solo el estado — PATCH /api/tasks/:id/status
-// Solo acepta el campo status con los tres valores válidos del sistema
+// Solo acepta el campo status con los cuatro valores válidos del sistema
+// ACTUALIZACIÓN: se agrega "pendiente_aprobacion" al enum
 export const updateTaskStatusSchema = z.object({
     status: z.enum(
-        ['pendiente', 'en_progreso', 'completada'],
+        ESTADOS_VALIDOS,
         {
             required_error: 'El estado es obligatorio',
-            message:        "El estado debe ser: 'pendiente', 'en_progreso' o 'completada'",
+            message:        "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion' o 'completada'",
         }
     ),
 });
