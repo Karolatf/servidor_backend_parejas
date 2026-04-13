@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "306ad102-5f8d-43d8-a71e-eb15dc4e2965",
+    "_postman_id": "e451f3dc-1133-4f46-9c4c-91e38dffe05c",
     "name": "SISTEMA GESTIÓN DE TAREAS",
     "description": "BIENVENIDO AL PROYECTO",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -13,27 +13,22 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}",
           "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            ""
+            "{{BASE_URL}}"
           ]
         }
       },
       "response": []
     },
     {
-      "name": "POST USERS",
+      "name": "CREAR USUARIOS",
       "request": {
         "method": "POST",
         "header": [],
         "body": {
           "mode": "raw",
-          "raw": "{ \"documento\": \"1234567897\", \"name\": \"Karol Torres\", \"email\": \"karol.torres@gmail.com\" }",
+          "raw": "{ \"documento\": \"1592648730\", \"name\": \"Wilmer Ardila\", \"email\": \"wilmer@sena.edu.co\" }",
           "options": {
             "raw": {
               "language": "json"
@@ -41,14 +36,11 @@
           }
         },
         "url": {
-          "raw": "http://localhost:3000/api/users",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}/users",
           "host": [
-            "localhost"
+            "{{BASE_URL}}"
           ],
-          "port": "3000",
           "path": [
-            "api",
             "users"
           ]
         }
@@ -56,13 +48,13 @@
       "response": []
     },
     {
-      "name": "POST TASKS",
+      "name": "CREAR TAREAS",
       "request": {
         "method": "POST",
         "header": [],
         "body": {
           "mode": "raw",
-          "raw": "{ \"title\": \"Tarea para actualizar\", \"description\": \"Prueba UPDATE MySQL\", \"status\": \"pendiente\", \"assignedUsers\": [1, 2, 3] }",
+          "raw": "{ \"title\": \"Mi tarea de prueba\", \"status\": \"pendiente\" }",
           "options": {
             "raw": {
               "language": "json"
@@ -70,14 +62,11 @@
           }
         },
         "url": {
-          "raw": "http://localhost:3000/api/tasks",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}/tasks",
           "host": [
-            "localhost"
+            "{{BASE_URL}}"
           ],
-          "port": "3000",
           "path": [
-            "api",
             "tasks"
           ]
         }
@@ -85,19 +74,16 @@
       "response": []
     },
     {
-      "name": "GET ALL USERS",
+      "name": "LISTAR TODOS LOS USUARIOS",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/users",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}/users",
           "host": [
-            "localhost"
+            "{{BASE_URL}}"
           ],
-          "port": "3000",
           "path": [
-            "api",
             "users"
           ]
         }
@@ -105,141 +91,16 @@
       "response": []
     },
     {
-      "name": "GET USER BY ID",
+      "name": "LISTA USUARIO POR ID",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "http://localhost:3000/api/users/19",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}/users/16",
           "host": [
-            "localhost"
+            "{{BASE_URL}}"
           ],
-          "port": "3000",
           "path": [
-            "api",
-            "users",
-            "19"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "GET ALL TASKS",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:3000/api/tasks",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "api",
-            "tasks"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "GET TASK BY ID",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:3000/api/tasks/5",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "api",
-            "tasks",
-            "5"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "PUT USERS",
-      "request": {
-        "method": "PUT",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"name\": \"Karol Torres Actualizado\", \"email\": \"karol.torres@sena.edu.co\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/api/users/19",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "api",
-            "users",
-            "19"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "PUT TASKS",
-      "request": {
-        "method": "PUT",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"title\": \"Tarea Actualizada yb Probada\", \"status\": \"en_progreso\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/api/tasks/1",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "api",
-            "tasks",
-            "1"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "DELETE USERS",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:3000/api/users/16",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "api",
             "users",
             "16"
           ]
@@ -248,7 +109,114 @@
       "response": []
     },
     {
-      "name": "DELETE TASKS",
+      "name": "LISTAR TODAS LAS TAREAS",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/tasks",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "tasks"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "LISTAR TAREAS POR ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/tasks/17",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "tasks",
+            "17"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "ACTUALIZAR USUARIOS",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"name\": \"Wilmer Ardila Actualizado\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/users/16",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "users",
+            "16"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "ACTUALIZAR TAREAS",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"title\": \"Mi tarea de prueba ACTUALIZADA\", \"description\": \"Prueba\", \"status\": \"en_progreso\", \"comment\": \"Hola\", \"assignedUsers\": [16] }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/tasks/17",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "tasks",
+            "17"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "ELIMINAR USUARIOS",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/users/16",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "users",
+            "16"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "ELIMINAR TAREAS",
       "request": {
         "method": "DELETE",
         "header": [],
@@ -257,20 +225,75 @@
           "raw": "{ \"title\": \"Tarea Actualizada\", \"status\": \"en_progreso\" }"
         },
         "url": {
-          "raw": "http://localhost:3000/api/tasks/3",
-          "protocol": "http",
+          "raw": "{{BASE_URL}}/tasks/3",
           "host": [
-            "localhost"
+            "{{BASE_URL}}"
           ],
-          "port": "3000",
           "path": [
-            "api",
             "tasks",
             "3"
           ]
         }
       },
       "response": []
+    },
+    {
+      "name": "ACTUALIZAR ESTADO TAREAS",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"status\": \"inventado\" }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/tasks/1/status",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "tasks",
+            "1",
+            "status"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": ""
     }
   ]
 }
