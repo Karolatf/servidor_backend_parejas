@@ -4,7 +4,7 @@
 -- AUTORES: Karol Torres, Sebastian Patiño, Paulo Pacheco
 -- SENA - Técnico en Programación de Software
 -- ============================================================
--- INSTRUCCIONES PARA SEBASTIÁN Y PAULO:
+-- INSTRUCCIONES:
 -- Este archivo lo ejecutan con la conexión app_user en Workbench.
 -- Antes, ejecuten el bloque en la conexion de root es decir este bloque (SI NO LO HAN HECHO YA):
 
@@ -36,7 +36,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     id              INT          NOT NULL AUTO_INCREMENT,
     title           VARCHAR(200) NOT NULL,
     description     TEXT,
-    status          VARCHAR(20)  NOT NULL DEFAULT 'pendiente',
+    -- status: almacena el estado actual de la tarea
+    -- VARCHAR(30) para soportar "pendiente_aprobacion" (22 chars)
+    -- Valores validos: pendiente | en_progreso | pendiente_aprobacion | completada
+    status          VARCHAR(30)  NOT NULL DEFAULT 'pendiente',
     comment         TEXT         NULL,
     assigned_users  JSON         NOT NULL DEFAULT (JSON_ARRAY()),
     created_ud      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -54,3 +57,10 @@ VALUES ('1097497002', 'Sebastian Patiño', 'sebastian@sena.edu.co');
 
 INSERT IGNORE INTO users (documento, name, email)
 VALUES ('1097497003', 'Karol Torres', 'karol@sena.edu.co');
+
+-- ============================================================
+-- MIGRACIONES — Ejecutar solo si la BD ya existia antes
+-- ============================================================
+-- Ampliar status a VARCHAR(30) para pendiente_aprobacion
+-- Ejecutar en MySQL Workbench con conexion app_user si ya tienes la BD creada:
+-- ALTER TABLE tasks MODIFY COLUMN status VARCHAR(30) NOT NULL DEFAULT 'pendiente';
