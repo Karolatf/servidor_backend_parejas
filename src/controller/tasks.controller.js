@@ -52,9 +52,9 @@ export const getTaskById = catchAsync(async (req, res) => {
 // Cuerpo esperado: { title, description, status, assignedUsers }
 // NOTA: la validación la realiza validateSchema(createTaskSchema) antes de llegar aquí.
 export const createTask = catchAsync(async (req, res) => {
-    const { title, description, status, assignedUsers } = req.body;
+    const { title, description, status, assignedUsers, comment } = req.body;
 
-    const nuevaTarea = await insertTask({ title, description, status, assignedUsers });
+    const nuevaTarea = await insertTask({ title, description, status, assignedUsers, comment });
     return successResponse(res, 'Tarea creada correctamente', nuevaTarea, 201);
 });
 
