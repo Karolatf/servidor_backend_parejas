@@ -9,6 +9,7 @@ import cors from 'cors';
 
 import { errorMiddleware } from './middlewares/error.middleware.js';
 import authRouter from './routes/auth.routes.js';
+import { verifyToken } from './middlewares/auth.middleware.js';
 import usersRouter from './routes/users.routes.js';
 import tasksRouter from './routes/tasks.routes.js';
 
@@ -36,11 +37,9 @@ app.get('/', (req, res) => {
 // Karol agregará verifyToken a /api/users y /api/tasks en su rama
 app.use('/api/auth', authRouter);
 
-// rutas de usuarios: GET/POST/PUT/DELETE /api/users
-app.use('/api/users', usersRouter);
-
-// rutas de tareas: GET/POST/PUT/PATCH/DELETE /api/tasks
-app.use('/api/tasks', tasksRouter);
+// Rutas protegidas — verifyToken valida el JWT antes de llegar al controlador
+app.use('/api/users', verifyToken, usersRouter);
+app.use('/api/tasks', verifyToken, tasksRouter);
 
 // Middleware global de errores — debe registrarse DESPUÉS de todas las rutas
 // Si se registra antes, los errores de las rutas no llegarán aquí
