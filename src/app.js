@@ -8,6 +8,7 @@ import express from 'express';
 import cors from 'cors';
 
 import { errorMiddleware } from './middlewares/error.middleware.js';
+import authRouter from './routes/auth.routes.js';
 import usersRouter from './routes/users.routes.js';
 import tasksRouter from './routes/tasks.routes.js';
 
@@ -30,6 +31,10 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
     res.status(200).json({ message: 'Bienvenido al servidor de Gestión de Tareas — SENA' });
 });
+
+// Ruta de autenticación — PÚBLICA (no requiere token todavía)
+// Karol agregará verifyToken a /api/users y /api/tasks en su rama
+app.use('/api/auth', authRouter);
 
 // rutas de usuarios: GET/POST/PUT/DELETE /api/users
 app.use('/api/users', usersRouter);
