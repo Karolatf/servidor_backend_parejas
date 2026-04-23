@@ -24,7 +24,8 @@ import {
     createUser,
     updateUser,
     deleteUser,
-    getUserTasks
+    getUserTasks,
+    changeUserRole,          // ← nueva función
 } from '../controller/users.controller.js';
 
 // Se importa el middleware genérico de validación (creado por Sebastián)
@@ -35,6 +36,9 @@ import {
     createUserSchema,
     updateUserSchema,
 } from '../../schemas/user.schema.js';
+
+import { requireAdmin } from '../middlewares/auth.middleware.js';
+import { changeRoleSchema } from '../../schemas/user.schema.js';
 
 const router = Router();
 
@@ -69,5 +73,11 @@ router.put('/:id', validateSchema(updateUserSchema), updateUser);
 
 // DELETE /api/users/:id — elimina un usuario del sistema (no requiere validación de body)
 router.delete('/:id', deleteUser);
+
+// PATCH /api/users/:id/role — cambia el rol de un usuario
+// verifyToken ya se aplica en app.js para todas las rutas /api/users
+// requireAdmin verifica adicionalmente que el usuario autenticado sea admin
+// validateSchema(changeRoleSchema) valida que role sea 'admin' o 'user'
+router.patch('/:id/role', requireAdmin, validateSchema(changeRoleSchema), changeUserRole);
 
 export default router;

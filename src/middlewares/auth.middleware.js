@@ -51,3 +51,32 @@ export function verifyToken(req, res, next) {
         return res.status(401).json({ error: 'Acceso denegado: Token inválido' });
     }
 }
+
+// ── MIDDLEWARE: VERIFICAR QUE EL USUARIO ES ADMIN ────────────────────────────
+// Se usa como segundo middleware en rutas que solo los admin pueden usar.
+// Ejemplo de uso en la ruta: router.patch('/:id/role', verifyToken, requireAdmin, changeUserRole)
+//
+// verifyToken ya verificó la firma del JWT y adjuntó req.usuario al request.
+// requireAdmin solo verifica que req.usuario.role sea 'admin'.
+//
+// Si el usuario no es admin responde 403 Forbidden con mensaje en español.
+// 403 significa "autenticado pero sin permisos" (distinto de 401 "no autenticado").
+export function requireAdmin(req, res, next) {
+
+    // req.usuario fue adjuntado por verifyToken, que debe ejecutarse primero
+    // Si por alguna razón req.usuario no existe, denegar el acceso
+    if (!req.usuario) {
+        return res.status(401).json({ error: 'Acceso denegado: Token requerido' });
+    }
+
+    // Verificar que el rol en el payload del JWT sea 'admin'
+    // El role queda en el token al hacer login y no cambia hasta el próximo login
+    if (req.usuario.role !== 'admin') {
+        return res.status(403).json({
+            error: 'Acceso denegado: Se requieren permisos de administrador para esta acción',
+        });
+    }
+
+    // El usuario es admin — continuar al controlador
+    next();
+}
