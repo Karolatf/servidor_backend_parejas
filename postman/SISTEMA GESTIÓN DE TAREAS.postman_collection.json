@@ -8,6 +8,439 @@
   },
   "item": [
     {
+      "name": "AUTENTICACIÓN",
+      "item": [
+        {
+          "name": "LOGIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {\r",
+                  "    const cuerpoRespuesta = pm.response.json();\r",
+                  "    \r",
+                  "    const accessToken  = cuerpoRespuesta.data.accessToken;\r",
+                  "    const refreshToken = cuerpoRespuesta.data.refreshToken;\r",
+                  "    \r",
+                  "    pm.environment.set('ACCESS_TOKEN',  accessToken);\r",
+                  "    pm.environment.set('REFRESH_TOKEN', refreshToken);\r",
+                  "    \r",
+                  "    console.log('Access y Refresh token guardados automáticamente');\r",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCES_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"sebastian@sena.edu.co\",\r\n  \"password\": \"SEBAS2003\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/login",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "REGISTER",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Nicolle Fuentes\",\r\n  \"documento\": \"9876543210\",\r\n  \"email\": \"nicolle@gmail.com\",\r\n  \"password\": \"nicolle123\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/register",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "RENOVAR TOKEN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCES_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/refresh",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "USUARIOS",
+      "item": [
+        {
+          "name": "LISTAR TODOS LOS USUARIOS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "LISTA USUARIO POR ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/16",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "16"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "LISTAR USUARIO POR DOCUMENTO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCES_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/by-document/1097497002",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "by-document",
+                "1097497002"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR USUARIOS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"documento\": \"1592648730\", \"name\": \"Wilmer Ardila\", \"email\": \"wilmer@sena.edu.co\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/users",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR USUARIOS",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Wilmer Ardila Actualizado\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/users/16",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "16"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ELIMINAR USUARIOS",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/16",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "16"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "LISTAR TAREAS DE UN USUARIO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCES_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/3/tasks",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "3",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CAMBIO DE ROL",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "TAREAS",
+      "item": [
+        {
+          "name": "LISTAR TODAS LAS TAREAS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/tasks",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR TAREAS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"title\": \"Mi tarea de prueba\", \"status\": \"pendiente\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/tasks",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "LISTAR TAREAS POR ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/tasks/17",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks",
+                "17"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR TAREAS",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"title\": \"Mi tarea de prueba ACTUALIZADA\", \"description\": \"Prueba\", \"status\": \"en_progreso\", \"comment\": \"Hola\", \"assignedUsers\": [16] }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/tasks/17",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks",
+                "17"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ELIMINAR TAREAS",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"title\": \"Tarea Actualizada\", \"status\": \"en_progreso\" }"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/tasks/3",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks",
+                "3"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR ESTADO TAREAS",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"inventado\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/tasks/1/status",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "tasks",
+                "1",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "MENSAJE DE BIENVENIDA",
       "request": {
         "method": "GET",
@@ -16,250 +449,6 @@
           "raw": "{{BASE_URL}}",
           "host": [
             "{{BASE_URL}}"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "CREAR USUARIOS",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"documento\": \"1592648730\", \"name\": \"Wilmer Ardila\", \"email\": \"wilmer@sena.edu.co\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/users",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "users"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "CREAR TAREAS",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"title\": \"Mi tarea de prueba\", \"status\": \"pendiente\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/tasks",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "LISTAR TODOS LOS USUARIOS",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{BASE_URL}}/users",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "users"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "LISTA USUARIO POR ID",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{BASE_URL}}/users/16",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "users",
-            "16"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "LISTAR TODAS LAS TAREAS",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{BASE_URL}}/tasks",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "LISTAR TAREAS POR ID",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{BASE_URL}}/tasks/17",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks",
-            "17"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "ACTUALIZAR USUARIOS",
-      "request": {
-        "method": "PUT",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"name\": \"Wilmer Ardila Actualizado\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/users/16",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "users",
-            "16"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "ACTUALIZAR TAREAS",
-      "request": {
-        "method": "PUT",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"title\": \"Mi tarea de prueba ACTUALIZADA\", \"description\": \"Prueba\", \"status\": \"en_progreso\", \"comment\": \"Hola\", \"assignedUsers\": [16] }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/tasks/17",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks",
-            "17"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "ELIMINAR USUARIOS",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "url": {
-          "raw": "{{BASE_URL}}/users/16",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "users",
-            "16"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "ELIMINAR TAREAS",
-      "request": {
-        "method": "DELETE",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"title\": \"Tarea Actualizada\", \"status\": \"en_progreso\" }"
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/tasks/3",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks",
-            "3"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "ACTUALIZAR ESTADO TAREAS",
-      "request": {
-        "method": "PATCH",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{ \"status\": \"inventado\" }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "{{BASE_URL}}/tasks/1/status",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "tasks",
-            "1",
-            "status"
           ]
         }
       },
@@ -292,7 +481,15 @@
   ],
   "variable": [
     {
-      "key": "BASE_URL",
+      "key": "URL_API",
+      "value": ""
+    },
+    {
+      "key": "ACCES_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "REFRESH_TOKEN",
       "value": ""
     }
   ]
