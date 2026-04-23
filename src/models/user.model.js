@@ -80,16 +80,6 @@ export async function updateUser(id, campos) {
     return getUserById(id);
 }
 
-// elimina un usuario de la tabla users
-// primero guarda el objeto para retornarlo y confirmar qué se eliminó
-export async function deleteUser(id) {
-    const aEliminar = await getUserById(id);
-    if (!aEliminar) return null;
-
-    await pool.query('DELETE FROM users WHERE id = ?', [Number(id)]);
-    return aEliminar;
-}
-
 // ── NUEVA FUNCIÓN: busca usuario por email ───────────────────────────────────
 // GET interno — se usa en loginService y registerService de auth.service.js
 // Antes el login buscaba por documento. Ahora busca por email porque el
@@ -104,4 +94,39 @@ export async function getUserByEmail(email) {
     );
     // rows[0] es el primer resultado o undefined si no hay coincidencia
     return rows[0];
+}
+
+// ── CREAR USUARIO CON CONTRASEÑA Y ROL ───────────────────────────────────────
+// Se usa exclusivamente desde registerService en auth.service.js.
+// La función createUser que ya existe en este archivo no acepta password ni role,
+// por eso se crea esta variante separada para el flujo de registro.
+//
+// Parámetros:
+//   name     — nombre completo del usuario
+//   documento — número de documento de identidad (solo dígitos)
+//   email    — correo electrónico del usuario
+//   password — contraseña ya hasheada con bcrypt (NUNCA texto plano)
+//   role     — rol del usuario ('user' o 'admin'), por defecto 'user'
+//
+// Retorna el objeto completo del usuario recién creado (incluyendo password
+// para que registerService pueda excluirlo antes de responder al cliente).
+export async function createUserWithPassword({ name, documento, email, password, role = 'user' }) {
+    // INSERT con los 5 campos: los 3 básicos + password hasheada + role
+    const [result] = await pool.query(
+        'INSERT INTO users (name, documento, email, password, role) VALUES (?, ?, ?, ?, ?)',
+        [name, documento, email, password, role]
+    );
+    // result.insertId es el id AUTO_INCREMENT que MySQL asignó a la nueva fila
+    // Se usa getUserById (ya existe en este archivo) para retornar el objeto completo
+    return getUserById(result.insertId);
+}
+
+// elimina un usuario de la tabla users
+// primero guarda el objeto para retornarlo y confirmar qué se eliminó
+export async function deleteUser(id) {
+    const aEliminar = await getUserById(id);
+    if (!aEliminar) return null;
+
+    await pool.query('DELETE FROM users WHERE id = ?', [Number(id)]);
+    return aEliminar;
 }
