@@ -20,7 +20,8 @@ import {
     getUserByDocumento  as findUserByDocumento,
     createUser          as insertUser,
     updateUser          as modifyUser,
-    deleteUser          as removeUser
+    deleteUser          as removeUser,
+    updateUserRole,                          // ← nueva función
 } from '../models/user.model.js';
 
 import { getTasksByUserId } from '../models/task.model.js';
@@ -112,4 +113,37 @@ export const getUserTasks = catchAsync(async (req, res) => {
     const { userId } = req.params;
     const tareas     = await getTasksByUserId(userId);
     return successResponse(res, 'Tareas del usuario obtenidas correctamente', tareas);
+});
+
+// ── PATCH /api/users/:id/role ────────────────────────────────────────────────
+// Cambia el rol de un usuario entre 'admin' y 'user'.
+// Solo accesible para usuarios autenticados con role = 'admin'.
+// (El middleware requireAdmin verifica esto antes de que llegue aquí.)
+//
+// Cuerpo esperado (validado por validateSchema(changeRoleSchema)):
+//   { role: 'admin' | 'user' }
+//
+// Respuesta exitosa 200: { success, message, data: usuario sin password }
+// Error 404: el id no existe
+export const changeUserRole = catchAsync(async (req, res) => {
+    const { id }       = req.params;
+    const { role }     = req.body;
+
+    // updateUserRole actualiza solo el campo role en MySQL
+    // Retorna el usuario actualizado, o null si el id no existe
+    const usuarioActualizado = await updateUserRole(id, role);
+
+    if (!usuarioActualizado) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // Construir la respuesta sin el campo password
+    // Se usa desestructuración para excluir el campo sensible antes de enviar
+    const { password: _ignorado, ...usuarioSinPassword } = usuarioActualizado;
+
+    return successResponse(
+        res,
+        `Rol de ${usuarioActualizado.name} actualizado a '${role}' correctamente`,
+        usuarioSinPassword
+    );
 });

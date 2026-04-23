@@ -53,3 +53,18 @@ export const createUserSchema = z.object({
 // Igual que createUserSchema pero todos los campos son opcionales (partial)
 // Permite actualizar solo documento, solo name, solo email o cualquier combinación
 export const updateUserSchema = createUserSchema.partial();
+
+// ── SCHEMA PARA CAMBIAR ROL ──────────────────────────────────────────────────
+// PATCH /api/users/:id/role
+// Cuerpo esperado: { role: 'admin' | 'user' }
+//
+// Solo acepta los dos valores válidos del sistema.
+// validateSchema(changeRoleSchema) se aplica en la ruta correspondiente.
+export const changeRoleSchema = z.object({
+    // role: obligatorio, solo acepta 'admin' o 'user'
+    // El mensaje de error en español explica exactamente qué se acepta
+    role: z.enum(['admin', 'user'], {
+        required_error: 'El rol es obligatorio',
+        message:        "El rol debe ser 'admin' o 'user'",
+    }),
+});

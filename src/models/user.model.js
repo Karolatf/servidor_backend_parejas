@@ -130,3 +130,30 @@ export async function deleteUser(id) {
     await pool.query('DELETE FROM users WHERE id = ?', [Number(id)]);
     return aEliminar;
 }
+
+// ── ACTUALIZAR ROL DE USUARIO ────────────────────────────────────────────────
+// Se usa desde changeUserRole en users.controller.js.
+// Solo actualiza el campo 'role', no toca ningún otro dato del usuario.
+//
+// Parámetros:
+//   id   — id numérico del usuario a modificar
+//   role — nuevo rol: 'admin' o 'user' (validado en el schema antes de llegar aquí)
+//
+// Retorna el usuario actualizado sin el campo password,
+// o null si el id no existe en la tabla users.
+export async function updateUserRole(id, role) {
+    // Verificar que el usuario existe antes de intentar actualizar
+    const existente = await getUserById(id);
+    if (!existente) return null;
+
+    // UPDATE solo modifica el campo role, no el updated_up timestamp
+    // mysql2 reemplaza los ? por los valores de forma segura (evita SQL injection)
+    await pool.query(
+        'UPDATE users SET role = ? WHERE id = ?',
+        [role, Number(id)]
+    );
+
+    // Retornar el usuario con los datos actualizados desde MySQL
+    // getUserById incluye todos los campos excepto que el controlador los filtre
+    return getUserById(id);
+}
