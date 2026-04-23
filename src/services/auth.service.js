@@ -7,7 +7,7 @@
 
 import jwt    from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { getUserByDocumento, getUserById } from '../models/user.model.js';
+import { getUserByEmail, getUserById } from '../models/user.model.js';
 
 // Rondas de hashing para bcrypt.
 // 10 es el estándar recomendado por OWASP: buen balance entre seguridad y velocidad.
@@ -44,29 +44,44 @@ export function generarRefreshToken(usuario) {
     );
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
-// Valida las credenciales y retorna los tokens si son correctas.
-// Retorna null si el documento no existe o la contraseña no coincide.
-// El controlador decide el código HTTP — este servicio solo retorna datos.
-export async function loginService({ documento, password }) {
-    // 1. Buscar el usuario por documento
-    const usuario = await getUserByDocumento(documento);
+// ── LOGIN (VERSIÓN ACTUALIZADA) ──────────────────────────────────────────────
+// POST /api/auth/login
+// Cuerpo: { email, password }
+// Retorna los tokens y datos del usuario, o null si las credenciales son incorrectas.
+//
+// CAMBIO: antes buscaba por documento, ahora busca por email.
+// Esto es coherente con el formulario del frontend que pide email + contraseña.
+// El payload del JWT sigue siendo { id, documento, role } para que el frontend
+// pueda identificar al usuario sin cambiar la lógica de fetchConAuth.js.
+//
+// El orden de las propiedades en el objeto de retorno también se ajusta:
+// primero accessToken, luego refreshToken, luego user, como pide el cliente.
+export async function loginService({ email, password }) {
 
-    // Si el usuario no existe devolvemos null sin revelar si el documento existe o no
+    // 1. Buscar el usuario por email (cambio respecto a la versión anterior)
+    // Se importa getUserByEmail al inicio del archivo en lugar de getUserByDocumento
+    const usuario = await getUserByEmail(email);
+
+    // Si el usuario no existe devolvemos null sin revelar si el email existe o no
+    // Responder con un mensaje genérico evita ataques de enumeración de usuarios
     if (!usuario) return null;
 
-    // 2. Si el usuario no tiene contraseña configurada, no puede iniciar sesión
+    // 2. Si el usuario no tiene contraseña configurada no puede iniciar sesión
+    // Esto pasa cuando el usuario fue creado manualmente sin hash (como con el script)
     if (!usuario.password) return null;
 
     // 3. Comparar la contraseña enviada con el hash guardado en la BD
+    // bcrypt.compare devuelve true si coinciden, false si no
     const passwordCorrecta = await bcrypt.compare(password, usuario.password);
     if (!passwordCorrecta) return null;
 
-    // 4. Generar los dos tokens
+    // 4. Generar los dos tokens con las funciones ya existentes en este mismo archivo
     const accessToken  = generarAccessToken(usuario);
     const refreshToken = generarRefreshToken(usuario);
 
-    // 5. Retornar tokens y datos públicos del usuario (nunca la contraseña)
+    // 5. Retornar los datos en el orden que pide el cliente:
+    // accessToken primero, refreshToken segundo, user al final
+    // El campo password NUNCA se incluye en la respuesta
     return {
         accessToken,
         refreshToken,

@@ -89,3 +89,19 @@ export async function deleteUser(id) {
     await pool.query('DELETE FROM users WHERE id = ?', [Number(id)]);
     return aEliminar;
 }
+
+// ── NUEVA FUNCIÓN: busca usuario por email ───────────────────────────────────
+// GET interno — se usa en loginService y registerService de auth.service.js
+// Antes el login buscaba por documento. Ahora busca por email porque el
+// formulario de login del frontend pide email + contraseña.
+// Retorna el usuario encontrado (con el campo password incluido para bcrypt),
+// o undefined si no existe ningún usuario con ese email.
+export async function getUserByEmail(email) {
+    // La consulta usa un placeholder ? para evitar inyección SQL (mysql2 lo reemplaza)
+    const [rows] = await pool.query(
+        'SELECT * FROM users WHERE email = ?',
+        [email.toString().toLowerCase().trim()]
+    );
+    // rows[0] es el primer resultado o undefined si no hay coincidencia
+    return rows[0];
+}
