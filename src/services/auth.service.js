@@ -7,7 +7,12 @@
 
 import jwt    from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { getUserByEmail, getUserById } from '../models/user.model.js';
+import {
+    getUserByEmail,
+    getUserById,
+    getUserByDocumento,
+    createUserWithPassword,
+} from '../models/user.model.js';
 
 // Rondas de hashing para bcrypt.
 // 10 es el estándar recomendado por OWASP: buen balance entre seguridad y velocidad.
@@ -107,4 +112,62 @@ export async function renovarAccessTokenService(refreshToken) {
 
     // Emitir un nuevo accessToken con los datos actuales del usuario
     return generarAccessToken(usuario);
+}
+
+// ── REGISTRO DE USUARIO ──────────────────────────────────────────────────────
+// POST /api/auth/register
+// Cuerpo: { name, documento, email, password }
+//
+// Este servicio es nuevo: no existía antes porque el sistema dependía del
+// script manual scripts/changePassword.js para crear usuarios con contraseña.
+// Ahora el usuario puede registrarse directamente desde la pantalla de inicio.
+//
+// El registro:
+//   1. Verifica que el email no esté en uso (409 si ya existe)
+//   2. Verifica que el documento no esté en uso (409 si ya existe)
+//   3. Hashea la contraseña con bcrypt antes de guardarla en MySQL
+//   4. Crea el usuario con role = 'user' por defecto
+//   5. Retorna el usuario creado sin el campo password
+//
+// Retorna un objeto { error, usuario } en lugar de solo el usuario para que
+// el controlador pueda distinguir entre un éxito y un error 409 sin usar try/catch.
+export async function registerService({ name, documento, email, password }) {
+
+    // 1. Verificar que el email no esté registrado ya
+    // getUserByEmail viene del modelo de usuarios y busca en la tabla users de MySQL
+    const usuarioPorEmail = await getUserByEmail(email);
+    if (usuarioPorEmail) {
+        // Se retorna un objeto de error en lugar de lanzar excepción
+        // para que el controlador pueda responder con 409 de forma limpia
+        return { error: 'El correo electrónico ya está registrado en el sistema', codigo: 409 };
+    }
+
+    // 2. Verificar que el documento no esté registrado ya
+    // getUserByDocumento viene del modelo y busca en la columna 'documento' de la tabla users
+    const usuarioPorDocumento = await getUserByDocumento(documento);
+    if (usuarioPorDocumento) {
+        return { error: 'El número de documento ya está registrado en el sistema', codigo: 409 };
+    }
+
+    // 3. Hashear la contraseña antes de guardarla en la base de datos
+    // NUNCA se guarda una contraseña en texto plano en la BD
+    // SALT_ROUNDS = 10 es el estándar recomendado por OWASP (ya está definido arriba en el archivo)
+    const passwordHasheada = await hashearPassword(password);
+
+    // 4. Crear el usuario en MySQL con la contraseña ya hasheada
+    // createUserWithPassword es una función nueva que se agrega al modelo
+    // (ver src/models/user.model.js más abajo)
+    // El rol es 'user' por defecto — solo un admin puede cambiar el rol después
+    const usuarioCreado = await createUserWithPassword({
+        name,
+        documento,
+        email,
+        password: passwordHasheada,
+        role: 'user',
+    });
+
+    // 5. Retornar el usuario sin el campo password
+    // Se usa desestructuración para excluir password del objeto de retorno
+    const { password: _ignorado, ...usuarioSinPassword } = usuarioCreado;
+    return { usuario: usuarioSinPassword };
 }
