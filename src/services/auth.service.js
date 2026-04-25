@@ -61,32 +61,25 @@ export function generarRefreshToken(usuario) {
 //
 // El orden de las propiedades en el objeto de retorno también se ajusta:
 // primero accessToken, luego refreshToken, luego user, como pide el cliente.
+
 export async function loginService({ email, password }) {
 
-    // 1. Buscar el usuario por email (cambio respecto a la versión anterior)
-    // Se importa getUserByEmail al inicio del archivo en lugar de getUserByDocumento
-    const usuario = await getUserByEmail(email);
+    // 1. Buscar el usuario por email — CORRECTO
+    // INCORRECTO sería: getUserByDocumento(documento)
+    const usuario = await getUserByEmail(email); // ← esta línea debe decir email, no documento
 
-    // Si el usuario no existe devolvemos null sin revelar si el email existe o no
-    // Responder con un mensaje genérico evita ataques de enumeración de usuarios
     if (!usuario) return null;
-
-    // 2. Si el usuario no tiene contraseña configurada no puede iniciar sesión
-    // Esto pasa cuando el usuario fue creado manualmente sin hash (como con el script)
     if (!usuario.password) return null;
 
-    // 3. Comparar la contraseña enviada con el hash guardado en la BD
-    // bcrypt.compare devuelve true si coinciden, false si no
+    // 2. Comparar contraseña con bcrypt
     const passwordCorrecta = await bcrypt.compare(password, usuario.password);
     if (!passwordCorrecta) return null;
 
-    // 4. Generar los dos tokens con las funciones ya existentes en este mismo archivo
+    // 3. Generar tokens
     const accessToken  = generarAccessToken(usuario);
     const refreshToken = generarRefreshToken(usuario);
 
-    // 5. Retornar los datos en el orden que pide el cliente:
-    // accessToken primero, refreshToken segundo, user al final
-    // El campo password NUNCA se incluye en la respuesta
+    // 4. Retornar sin password
     return {
         accessToken,
         refreshToken,
@@ -95,6 +88,8 @@ export async function loginService({ email, password }) {
             name:      usuario.name,
             role:      usuario.role,
             documento: usuario.documento,
+            // IMPORTANTE: incluir email para que el panel de usuario lo muestre
+            email:     usuario.email,
         },
     };
 }
