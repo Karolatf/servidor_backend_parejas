@@ -7,7 +7,6 @@ Este documento establece las reglas de convivencia, comunicación y estándares 
 | :--- | :--- | :--- |
 | Karol Torres | Líder (Arquitecto) | `@karolatf` |
 | Sebastián Patiño | Desarrollador | `@SebasPatino` |
-|Paulo Zapata | Desarrollador | `Pauloz17` |
 
 ## 2. Canales de Comunicación
 Para mantener el orden y separar lo profesional de lo personal, usaremos los siguientes canales:
@@ -20,7 +19,7 @@ Para mantener el orden y separar lo profesional de lo personal, usaremos los sig
 * **Tiempo máximo de respuesta:** Nos comprometemos a responder mensajes del equipo en un máximo de 30 min durante el horario hábil.
 
 ## 4. Reglas de Desarrollo
-* **Prohibido el "Push" a Main:** Nadie, bajo ninguna circunstancia, subirá código directamente a `main` o `develop` sin pasar por un Pull Request.
+* **Prohibido el "Push" a Main:** Nadie, bajo ninguna circunstancia, subirá código directamente a `main` o `release` sin pasar por un Pull Request.
 * **Regla del Bloqueo (Timeboxing):** Si un desarrollador lleva más de 2 horas atascado en el mismo error, **debe** levantar la mano y pedir ayuda al equipo. No se permite perder días enteros en silencio.
 * **Calidad antes que velocidad:** Ningún código se envía a revisión si tiene `console.log`, errores en la terminal, o si rompe el diseño en dispositivos móviles.
 
