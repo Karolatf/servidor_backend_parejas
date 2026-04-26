@@ -334,5 +334,39 @@ CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TU_CONTRASEÑA';
 GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
+## Arquitectura de Base de Datos — v4.0
+
+El sistema usa 3 archivos SQL separados que deben ejecutarse en este orden:
+
+### 1. `database/connection.sql`
+Crea la base de datos `gestion_tareas_sena` y el usuario `app_user`.
+Ejecutar con conexión de **root** en MySQL Workbench (solo si no se ha ejecutado antes).
+
+### 2. `database/schema.sql`
+Crea las tablas principales del sistema:
+- `users` — usuarios del sistema con campo `role` VARCHAR
+- `tasks` — tareas con `assigned_users` en formato JSON
+
+### 3. `database/rbac.sql`
+Implementa la arquitectura RBAC (Role-Based Access Control):
+- `roles` — roles del sistema: `admin`, `user`, `instructor`
+- `permissions` — permisos atómicos (ej: `tasks.create`, `users.delete`)
+- `role_permissions` — relación M:N entre roles y permisos
+- `user_roles` — relación M:N entre usuarios y roles
+
+### Matriz RBAC del Sistema
+
+| Permiso | admin | instructor | user |
+|---------|:-----:|:----------:|:----:|
+| tasks.create | ✅ | ✅ | ❌ |
+| tasks.view.all | ✅ | ✅ | ✅ |
+| tasks.update | ✅ | ✅ | ❌ |
+| tasks.delete.all | ✅ | ✅ | ❌ |
+| tasks.assign | ✅ | ✅ | ❌ |
+| tasks.status.update | ✅ | ✅ | ✅ |
+| users.view | ✅ | ✅ | ❌ |
+| users.edit | ✅ | ❌ | ❌ |
+| users.delete | ✅ | ❌ | ❌ |
+| users.assign.role | ✅ | ❌ | ❌ |
 
 *Servicio Nacional de Aprendizaje (SENA) · Técnico en Programación de Software · 2026*
