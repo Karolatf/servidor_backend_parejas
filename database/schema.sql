@@ -1,7 +1,7 @@
 -- ============================================================
 -- ARCHIVO: database/schema.sql
 -- PROYECTO: servidor_backend_parejas - Sistema de Gestión de Tareas
--- AUTORES: Karol Torres, Sebastian Patiño, Paulo Pacheco
+-- AUTORES: Karol Torres y Sebastian Patiño
 -- SENA - Técnico en Programación de Software
 -- ============================================================
 -- INSTRUCCIONES:
@@ -21,7 +21,7 @@ USE gestion_tareas_sena;
 -- TABLA: users
 -- documento UNIQUE: evita registrar la misma persona dos veces
 -- password: hash bcrypt de la contraseña (nunca texto plano)
--- role: 'admin' para administradores, 'user' para usuarios normales
+-- role: 'admin' para administradores, 'user' para usuarios normales, 'instructor' para docentes
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
     id          INT          NOT NULL AUTO_INCREMENT,
@@ -53,18 +53,3 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_up      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 );
-
--- ============================================================
--- DATOS INICIALES
--- INSERT IGNORE es idempotente: no falla si ya existen
--- password NULL: se asigna con el script seedPasswords.js después
--- role: Paulo es admin, Sebastián y Karol son usuarios normales
--- ============================================================
-INSERT IGNORE INTO users (documento, name, email, role)
-VALUES ('1097497001', 'Paulo Pacheco', 'paulo@sena.edu.co', 'admin');
-
-INSERT IGNORE INTO users (documento, name, email, role)
-VALUES ('1097497002', 'Sebastian Patiño', 'sebastian@sena.edu.co', 'admin');
-
-INSERT IGNORE INTO users (documento, name, email, role)
-VALUES ('1097497003', 'Karol Torres', 'karol@sena.edu.co', 'admin');
