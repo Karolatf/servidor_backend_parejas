@@ -26,6 +26,7 @@ import {
     deleteUser,
     getUserTasks,
     changeUserRole,          // ← nueva función
+    changeUserPassword 
 } from '../controller/users.controller.js';
 
 // Se importa el middleware genérico de validación (creado por Sebastián)
@@ -39,6 +40,8 @@ import {
 
 import { requireAdmin } from '../middlewares/auth.middleware.js';
 import { changeRoleSchema } from '../../schemas/user.schema.js';
+
+import { verifyToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -63,6 +66,11 @@ router.get('/by-document/:documento', getUserByDocumento);
 router.get('/:userId/tasks', getUserTasks);
 
 // ── RUTAS CON PARÁMETRO DINÁMICO /:id (van DESPUÉS de las específicas) ────────
+
+// PATCH /api/users/:id/password — cambio de contraseña del usuario logueado
+// verifyToken verifica que la petición viene de un usuario autenticado
+// Solo el usuario dueño del token puede cambiar su propia contraseña
+router.patch('/:id/password', verifyToken, changeUserPassword);
 
 // GET    /api/users/:id — obtiene un usuario por su id numérico (no requiere validación)
 router.get('/:id', getUserById);

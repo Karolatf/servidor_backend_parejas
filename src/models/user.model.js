@@ -161,15 +161,15 @@ export async function updateUserRole(id, role) {
 // ── OBTENER ROLES Y PERMISOS DE UN USUARIO (RBAC) ────────────────────────────
 // Se usa en el middleware authorization.middleware.js para verificar permisos.
 // También se usa en loginService para devolver los roles al frontend tras el login.
-//
+
 // Consulta las 4 tablas RBAC en una sola query con JOINs:
 //   users → user_roles → roles → role_permissions → permissions
-//
+
 // Parámetro: userId — id numérico del usuario
-//
+
 // Retorna un arreglo de objetos con la estructura:
 //   [{ name: 'admin', permissions: ['tasks.create', 'users.delete', ...] }, ...]
-//
+
 // Si el usuario no tiene roles en la tabla user_roles, retorna un arreglo vacío [].
 // Esto puede pasar con usuarios registrados antes de ejecutar rbac.sql.
 export async function getUserRolesAndPermissions(userId) {
@@ -216,4 +216,28 @@ export async function getUserRolesAndPermissions(userId) {
  
     // Object.values convierte el mapa de objetos a un arreglo de roles
     return Object.values(rolesMap);
+}
+
+// ── ACTUALIZAR CONTRASEÑA DE USUARIO ─────────────────────────────────────────
+// Se usa desde:
+//   1. PATCH /api/users/:id/password (cambio de contraseña desde el panel)
+//   2. POST /api/auth/reset-password (restablecimiento por código de Mailtrap)
+
+// Parámetro: id — id numérico del usuario
+// Parámetro: nuevaPasswordHasheada — contraseña ya hasheada con bcrypt (NUNCA texto plano)
+
+// Retorna: el usuario actualizado, o null si el id no existe.
+export async function updateUserPassword(id, nuevaPasswordHasheada) {
+    // Verificar que el usuario existe antes de intentar actualizar
+    const existente = await getUserById(id);
+    if (!existente) return null;
+ 
+    // Solo actualiza la columna password — ningún otro campo se toca
+    await pool.query(
+        'UPDATE users SET password = ? WHERE id = ?',
+        [nuevaPasswordHasheada, Number(id)]
+    );
+ 
+    // Retornar el usuario con los datos actualizados
+    return getUserById(id);
 }

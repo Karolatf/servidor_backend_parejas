@@ -26,6 +26,9 @@ import {
 
 import { getTasksByUserId } from '../models/task.model.js';
 
+import bcrypt from 'bcryptjs';
+import { updateUserPassword } from '../models/user.model.js';
+
 // GET /api/users
 // Retorna todos los usuarios con el formato estándar { success, message, data }
 export const getUsers = catchAsync(async (req, res) => {
@@ -146,4 +149,54 @@ export const changeUserRole = catchAsync(async (req, res) => {
         `Rol de ${usuarioActualizado.name} actualizado a '${role}' correctamente`,
         usuarioSinPassword
     );
+});
+
+// ── PATCH /api/users/:id/password ────────────────────────────────────────────
+// Cambio de contraseña desde el panel del usuario logueado.
+// Solo el usuario dueño del token puede cambiar su propia contraseña.
+//
+// Cuerpo esperado: { currentPassword, newPassword }
+// Respuesta 200: contraseña actualizada correctamente
+// Respuesta 400: contraseña actual incorrecta o datos inválidos
+// Respuesta 403: el usuario intenta cambiar la contraseña de otro usuario
+export const changeUserPassword = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { currentPassword, newPassword } = req.body;
+ 
+    // Validar que llegaron los campos necesarios
+    if (!currentPassword || !newPassword) {
+        return errorResponse(res, 'La contraseña actual y la nueva contraseña son obligatorias', 400);
+    }
+ 
+    // Validar longitud mínima de la nueva contraseña
+    if (newPassword.length < 6) {
+        return errorResponse(res, 'La nueva contraseña debe tener al menos 6 caracteres', 400);
+    }
+ 
+    // Solo el usuario logueado puede cambiar su propia contraseña
+    // req.usuario.id viene del token JWT verificado por verifyToken
+    if (Number(req.usuario.id) !== Number(id)) {
+        return errorResponse(res, 'No tienes permiso para cambiar la contraseña de otro usuario', 403);
+    }
+ 
+    // Obtener el usuario completo (incluyendo el hash de la contraseña)
+    const usuario = await findUserById(Number(id));
+    if (!usuario) {
+        return errorResponse(res, 'Usuario no encontrado', 404);
+    }
+ 
+    // Verificar que la contraseña actual sea correcta con bcrypt
+    const passwordCorrecta = await bcrypt.compare(currentPassword, usuario.password);
+    if (!passwordCorrecta) {
+        return errorResponse(res, 'La contraseña actual es incorrecta', 400);
+    }
+ 
+    // Hashear la nueva contraseña antes de guardarla
+    const SALT_ROUNDS = 10;
+    const nuevaPasswordHasheada = await bcrypt.hash(newPassword, SALT_ROUNDS);
+ 
+    // Actualizar la contraseña en la BD
+    await updateUserPassword(Number(id), nuevaPasswordHasheada);
+ 
+    return successResponse(res, 'Contraseña actualizada correctamente', null);
 });
