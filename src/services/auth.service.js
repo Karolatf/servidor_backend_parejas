@@ -12,6 +12,7 @@ import {
     getUserById,
     getUserByDocumento,
     createUserWithPassword,
+    getUserRolesAndPermissions,   // ← NUEVA importación para el RBAC
 } from '../models/user.model.js';
 
 // Rondas de hashing para bcrypt.
@@ -78,8 +79,17 @@ export async function loginService({ email, password }) {
     // 3. Generar tokens
     const accessToken  = generarAccessToken(usuario);
     const refreshToken = generarRefreshToken(usuario);
-
-    // 4. Retornar sin password
+ 
+    // 4. Obtener los roles y permisos del usuario desde las tablas RBAC.
+    //    Se consulta la BD en lugar de incluirlos en el JWT para:
+    //    a) Mantener el token ligero (solo id, documento, role)
+    //    b) Reflejar cambios de roles en tiempo real sin necesidad de re-login
+    //    Si el usuario no tiene roles en user_roles (instalación legacy),
+    //    retorna un arreglo vacío y el sistema funciona con el campo `role` del JWT.
+    const roles = await getUserRolesAndPermissions(usuario.id);
+ 
+    // 5. Retornar sin password — incluye los roles para que el frontend
+    //    pueda adaptar la UI según los permisos del usuario.
     return {
         accessToken,
         refreshToken,
@@ -88,9 +98,11 @@ export async function loginService({ email, password }) {
             name:      usuario.name,
             role:      usuario.role,
             documento: usuario.documento,
-            // IMPORTANTE: incluir email para que el panel de usuario lo muestre
             email:     usuario.email,
         },
+        // roles es el arreglo de objetos { name, permissions: [] }
+        // El frontend puede usarlo para mostrar/ocultar elementos según permisos
+        roles,
     };
 }
 

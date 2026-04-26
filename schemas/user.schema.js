@@ -56,15 +56,17 @@ export const updateUserSchema = createUserSchema.partial();
 
 // ── SCHEMA PARA CAMBIAR ROL ──────────────────────────────────────────────────
 // PATCH /api/users/:id/role
-// Cuerpo esperado: { role: 'admin' | 'user' }
-//
-// Solo acepta los dos valores válidos del sistema.
+// Cuerpo esperado: { role: 'admin' | 'user' | 'instructor' }
+
+// Solo acepta los tres valores válidos del sistema.
 // validateSchema(changeRoleSchema) se aplica en la ruta correspondiente.
+// ACTUALIZACIÓN: se agrega 'instructor' como tercer rol válido del sistema
 export const changeRoleSchema = z.object({
-    // role: obligatorio, solo acepta 'admin' o 'user'
-    // El mensaje de error en español explica exactamente qué se acepta
-    role: z.enum(['admin', 'user'], {
-        required_error: 'El rol es obligatorio',
-        message:        "El rol debe ser 'admin' o 'user'",
-    }),
+    role: z.enum(
+        ['admin', 'user', 'instructor'],   // ← se agrega 'instructor'
+        {
+            required_error: 'El rol es obligatorio',
+            message:        "El rol debe ser: 'admin', 'user' o 'instructor'",
+        }
+    ),
 });

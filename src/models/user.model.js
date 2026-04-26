@@ -157,3 +157,63 @@ export async function updateUserRole(id, role) {
     // getUserById incluye todos los campos excepto que el controlador los filtre
     return getUserById(id);
 }
+
+// ── OBTENER ROLES Y PERMISOS DE UN USUARIO (RBAC) ────────────────────────────
+// Se usa en el middleware authorization.middleware.js para verificar permisos.
+// También se usa en loginService para devolver los roles al frontend tras el login.
+//
+// Consulta las 4 tablas RBAC en una sola query con JOINs:
+//   users → user_roles → roles → role_permissions → permissions
+//
+// Parámetro: userId — id numérico del usuario
+//
+// Retorna un arreglo de objetos con la estructura:
+//   [{ name: 'admin', permissions: ['tasks.create', 'users.delete', ...] }, ...]
+//
+// Si el usuario no tiene roles en la tabla user_roles, retorna un arreglo vacío [].
+// Esto puede pasar con usuarios registrados antes de ejecutar rbac.sql.
+export async function getUserRolesAndPermissions(userId) {
+ 
+    // La query une las 4 tablas RBAC con LEFT JOINs para que si un rol
+    // no tiene permisos asignados, igual aparezca en el resultado (con permission NULL).
+    // El LEFT JOIN en role_permissions y permissions garantiza que roles sin permisos
+    // también se incluyan en la respuesta en lugar de desaparecer del resultado.
+    const [rows] = await pool.query(
+        `SELECT
+            r.name        AS roleName,
+            p.code        AS permissionCode
+        FROM user_roles ur
+        INNER JOIN roles       r  ON r.id  = ur.role_id
+        LEFT  JOIN role_permissions rp ON rp.role_id = r.id
+        LEFT  JOIN permissions  p  ON p.id  = rp.permission_id
+        WHERE ur.user_id = ?
+        ORDER BY r.name, p.code`,
+        [Number(userId)]
+    );
+ 
+    // Si el usuario no tiene roles en user_roles, retornar arreglo vacío
+    if (rows.length === 0) return [];
+ 
+    // Agrupar los resultados por nombre de rol, acumulando sus permisos en un arreglo.
+    // rows puede tener múltiples filas con el mismo roleName (una por cada permiso).
+    // Necesitamos convertirlas a: [{ name: 'admin', permissions: ['tasks.create', ...] }]
+    const rolesMap = {};
+ 
+    rows.forEach(function(fila) {
+        // Si este rol no está en el mapa todavía, creamos su entrada
+        if (!rolesMap[fila.roleName]) {
+            rolesMap[fila.roleName] = {
+                name:        fila.roleName,
+                permissions: [],
+            };
+        }
+        // Si tiene un permiso asignado (puede ser NULL si el rol no tiene permisos),
+        // lo agregamos al arreglo de permisos del rol
+        if (fila.permissionCode) {
+            rolesMap[fila.roleName].permissions.push(fila.permissionCode);
+        }
+    });
+ 
+    // Object.values convierte el mapa de objetos a un arreglo de roles
+    return Object.values(rolesMap);
+}
