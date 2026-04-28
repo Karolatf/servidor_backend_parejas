@@ -37,7 +37,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"david@gmail.com\",\n  \"password\": \"david123\"\n}",
+              "raw": "{\n  \"email\": \"sebastian@sena.edu.co\",\n  \"password\": \"sebas123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -490,6 +490,31 @@
                 "users",
                 "5",
                 "deactivate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "REACTIVAR USUARIO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/5/reactivate",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "5",
+                "reactivate"
               ]
             }
           },

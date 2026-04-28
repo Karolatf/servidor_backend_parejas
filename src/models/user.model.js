@@ -290,3 +290,19 @@ export async function countUserActiveTasks(userId) {
     // rows[0].total es el número de tareas activas — 0 significa que puede desactivarse
     return rows[0].total;
 }
+
+// ── REACTIVAR USUARIO ─────────────────────────────────────────────────────────
+// Operación inversa a deactivateUser — cambia is_active de 0 a 1.
+// Solo el admin puede ejecutar esta acción (requireAdmin en la ruta).
+// Retorna el usuario actualizado, o null si el id no existe.
+export async function reactivateUser(id) {
+    const existente = await getUserById(id);
+    if (!existente) return null;
+
+    await pool.query(
+        'UPDATE users SET is_active = 1 WHERE id = ?',
+        [Number(id)]
+    );
+
+    return getUserById(id);
+}

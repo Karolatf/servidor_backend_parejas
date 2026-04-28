@@ -29,6 +29,7 @@ import {
     changeUserPassword,
     // Importar el nuevo controlador de desactivación lógica
     deactivateUser,
+    reactivateUser,
 } from '../controller/users.controller.js';
 
 // Se importa el middleware genérico de validación (creado por Sebastián)
@@ -84,7 +85,9 @@ router.put('/:id', validateSchema(updateUserSchema), updateUser);
 // PATCH /api/users/:id/deactivate — desactiva un usuario (is_active = 0)
 // Solo el admin puede ejecutar esta acción — requireAdmin verifica el rol del token
 // No elimina el usuario ni sus tareas — solo bloquea su acceso al sistema
-router.patch('/:id/deactivate', requireAdmin, deactivateUser);
+router.patch('/:id/deactivate',  requireAdmin, deactivateUser);
+// Reactivar usuario desactivado — solo admin, mismo patrón que deactivate
+router.patch('/:id/reactivate',  requireAdmin, reactivateUser);
 
 // DELETE /api/users/:id — elimina un usuario del sistema (no requiere validación de body)
 router.delete('/:id', deleteUser);

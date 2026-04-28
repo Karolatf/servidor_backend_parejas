@@ -25,6 +25,7 @@ import {
     // Funciones nuevas para la desactivación lógica de usuario
     deactivateUser      as disableUser,     // marca is_active = 0 en la BD
     countUserActiveTasks,                   // cuenta tareas pendientes/en_progreso del usuario
+    reactivateUser      as enableUser,      // marca is_active = 1 en la BD
 } from '../models/user.model.js';
 
 import { getTasksByUserId } from '../models/task.model.js';
@@ -258,5 +259,37 @@ export const deactivateUser = catchAsync(async (req, res) => {
         res,
         `Usuario "${usuarioDesactivado.name}" desactivado correctamente`,
         usuarioDesactivado
+    );
+});
+
+// ── REACTIVAR USUARIO ─────────────────────────────────────────────────────────
+// PATCH /api/users/:id/reactivate
+// Reactiva un usuario que fue desactivado previamente (is_active = 0 → 1).
+// Solo el admin puede ejecutar esta acción (requireAdmin en la ruta).
+// No tiene restricciones de tareas — se puede reactivar en cualquier momento.
+export const reactivateUser = catchAsync(async (req, res) => {
+    const { id } = req.params;
+
+    // Verificar que el usuario existe
+    const usuario = await findUserById(id);
+    if (!usuario) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // Verificar que el usuario esté efectivamente desactivado antes de reactivar
+    if (usuario.is_active === 1 || usuario.is_active === true) {
+        return errorResponse(res, 'El usuario ya está activo', 400);
+    }
+
+    // Reactivar — enableUser hace UPDATE is_active = 1
+    const usuarioReactivado = await enableUser(id);
+    if (!usuarioReactivado) {
+        return errorResponse(res, 'Error al reactivar el usuario', 500);
+    }
+
+    return successResponse(
+        res,
+        `Usuario "${usuarioReactivado.name}" reactivado correctamente`,
+        usuarioReactivado
     );
 });
