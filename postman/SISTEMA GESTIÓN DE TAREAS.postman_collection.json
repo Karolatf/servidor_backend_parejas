@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "e451f3dc-1133-4f46-9c4c-91e38dffe05c",
+    "_postman_id": "dc5b5aeb-c410-4357-8fc9-1c20e744a1c6",
     "name": "SISTEMA GESTIÓN DE TAREAS",
-    "description": "BIENVENIDO AL PROYECTO",
+    "description": "Colección actualizada — Autenticación, RBAC, Recuperación de contraseña, Usuarios, Tareas",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52923475"
   },
@@ -17,16 +17,13 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "if (pm.response.code === 200) {\r",
-                  "    const cuerpoRespuesta = pm.response.json();\r",
-                  "    \r",
-                  "    const accessToken  = cuerpoRespuesta.data.accessToken;\r",
-                  "    const refreshToken = cuerpoRespuesta.data.refreshToken;\r",
-                  "    \r",
-                  "    pm.environment.set('ACCESS_TOKEN',  accessToken);\r",
-                  "    pm.environment.set('REFRESH_TOKEN', refreshToken);\r",
-                  "    \r",
-                  "    console.log('Access y Refresh token guardados automáticamente');\r",
+                  "if (pm.response.code === 200) {",
+                  "    const cuerpoRespuesta = pm.response.json();",
+                  "    const accessToken  = cuerpoRespuesta.data.accessToken;",
+                  "    const refreshToken = cuerpoRespuesta.data.refreshToken;",
+                  "    pm.environment.set('ACCESS_TOKEN',  accessToken);",
+                  "    pm.environment.set('REFRESH_TOKEN', refreshToken);",
+                  "    console.log('Access y Refresh token guardados automáticamente');",
                   "}"
                 ],
                 "type": "text/javascript",
@@ -37,16 +34,10 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{ACCES_TOKEN}}",
-                "type": "text"
-              }
-            ],
+            "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"email\": \"sebastian@sena.edu.co\",\r\n  \"password\": \"SEBAS2003\"\r\n}",
+              "raw": "{\n  \"email\": \"david@gmail.com\",\n  \"password\": \"david123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -62,7 +53,8 @@
                 "auth",
                 "login"
               ]
-            }
+            },
+            "description": "Inicia sesión y guarda automáticamente ACCESS_TOKEN y REFRESH_TOKEN en las variables de entorno.\n\nLa respuesta ahora incluye el campo `roles` con los permisos RBAC del usuario."
           },
           "response": []
         },
@@ -73,7 +65,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Nicolle Fuentes\",\r\n  \"documento\": \"9876543210\",\r\n  \"email\": \"nicolle@gmail.com\",\r\n  \"password\": \"nicolle123\"\r\n}",
+              "raw": "{\n  \"name\": \"David Patiño\",\n  \"documento\": \"1005331003\",\n  \"email\": \"david@gmail.com\",\n  \"password\": \"david123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -89,7 +81,8 @@
                 "auth",
                 "register"
               ]
-            }
+            },
+            "description": "Registra un nuevo usuario. Después de registrar a Karol y Sebastian, ejecutar el SQL del PASO 4 en Workbench para asignarles el rol admin."
           },
           "response": []
         },
@@ -100,13 +93,13 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{ACCES_TOKEN}}",
+                "value": "Bearer {{ACCESS_TOKEN}}",
                 "type": "text"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\r\n}",
+              "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -122,7 +115,97 @@
                 "auth",
                 "refresh"
               ]
-            }
+            },
+            "description": "Renueva el accessToken usando el refreshToken. Ejecutar cuando el accessToken expire."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "RECUPERACIÓN DE CONTRASEÑA",
+      "item": [
+        {
+          "name": "PASO 1 — SOLICITAR CÓDIGO",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sebastian@sena.edu.co\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/forgot-password",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Paso 1 del flujo de recuperación.\n\nEnvía un código de 6 dígitos al correo del usuario vía Mailtrap.\nEl código expira en 15 minutos.\n\nRespuesta 200 tanto si el email existe como si no (seguridad: no filtra emails registrados)."
+          },
+          "response": []
+        },
+        {
+          "name": "PASO 2 — VERIFICAR CÓDIGO",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sebastian@sena.edu.co\",\n  \"code\": \"560095\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/verify-reset-code",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "verify-reset-code"
+              ]
+            },
+            "description": "Paso 2 del flujo de recuperación.\n\nVerifica el código de 6 dígitos recibido en Mailtrap.\nReemplaza el valor de `code` con el código real que llegó al sandbox.\n\nRespuesta 400 si el código es incorrecto o ha expirado."
+          },
+          "response": []
+        },
+        {
+          "name": "PASO 3 — RESTABLECER CONTRASEÑA",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sebastian@sena.edu.co\",\n  \"newPassword\": \"sebas1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/auth/reset-password",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Paso 3 del flujo de recuperación.\n\nCambia la contraseña del usuario. Solo funciona si el código fue verificado previamente en el Paso 2.\n\nRespuesta 400 si se intenta sin haber pasado por el Paso 2 primero."
           },
           "response": []
         }
@@ -135,11 +218,17 @@
           "name": "LISTAR TODOS LOS USUARIOS",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{BASE_URL}}/users",
+              "raw": "{{URL_API}}/users",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "users"
@@ -149,18 +238,24 @@
           "response": []
         },
         {
-          "name": "LISTA USUARIO POR ID",
+          "name": "LISTAR USUARIO POR ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{BASE_URL}}/users/16",
+              "raw": "{{URL_API}}/users/2",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "users",
-                "16"
+                "2"
               ]
             }
           },
@@ -173,7 +268,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{ACCES_TOKEN}}",
+                "value": "Bearer {{ACCESS_TOKEN}}",
                 "type": "text"
               }
             ],
@@ -192,13 +287,19 @@
           "response": []
         },
         {
-          "name": "CREAR USUARIOS",
+          "name": "CREAR USUARIO",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"documento\": \"1592648730\", \"name\": \"Wilmer Ardila\", \"email\": \"wilmer@sena.edu.co\" }",
+              "raw": "{\n  \"name\": \"Pepito Fuentes\",\n  \"documento\": \"9876543201\",\n  \"email\": \"pepitof@gmail.com\",\n  \"password\": \"pepitof123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -206,9 +307,9 @@
               }
             },
             "url": {
-              "raw": "{{BASE_URL}}/users",
+              "raw": "{{URL_API}}/users",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "users"
@@ -218,13 +319,19 @@
           "response": []
         },
         {
-          "name": "ACTUALIZAR USUARIOS",
+          "name": "ACTUALIZAR USUARIO",
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"name\": \"Wilmer Ardila Actualizado\" }",
+              "raw": "{ \"name\": \"Nombre Actualizado\" }",
               "options": {
                 "raw": {
                   "language": "json"
@@ -232,31 +339,37 @@
               }
             },
             "url": {
-              "raw": "{{BASE_URL}}/users/16",
+              "raw": "{{URL_API}}/users/6",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "users",
-                "16"
+                "6"
               ]
             }
           },
           "response": []
         },
         {
-          "name": "ELIMINAR USUARIOS",
+          "name": "ELIMINAR USUARIO",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{BASE_URL}}/users/16",
+              "raw": "{{URL_API}}/users/6",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "users",
-                "16"
+                "6"
               ]
             }
           },
@@ -269,18 +382,18 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{ACCES_TOKEN}}",
+                "value": "Bearer {{ACCESS_TOKEN}}",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{URL_API}}/users/3/tasks",
+              "raw": "{{URL_API}}/users/2/tasks",
               "host": [
                 "{{URL_API}}"
               ],
               "path": [
                 "users",
-                "3",
+                "2",
                 "tasks"
               ]
             }
@@ -290,8 +403,95 @@
         {
           "name": "CAMBIO DE ROL",
           "request": {
-            "method": "GET",
-            "header": []
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"instructor\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/2/role",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "2",
+                "role"
+              ]
+            },
+            "description": "Cambia el rol de un usuario. Valores válidos: `admin`, `user`, `instructor`.\n\nActualizado en v4.0: ahora acepta el nuevo rol `instructor`."
+          },
+          "response": []
+        },
+        {
+          "name": "CAMBIAR CONTRASEÑA (usuario logueado)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"sebas1234\",\n  \"newPassword\": \"sebas123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/1/password",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "1",
+                "password"
+              ]
+            },
+            "description": "Cambia la contraseña del usuario logueado.\n\nReglas:\n- Solo el usuario dueño del token puede cambiar su propia contraseña (el id del path debe coincidir con el id del token).\n- `currentPassword` debe ser la contraseña actual correcta.\n- `newPassword` mínimo 6 caracteres.\n\nRespuesta 400 si la contraseña actual es incorrecta.\nRespuesta 403 si el id del path no coincide con el usuario del token."
+          },
+          "response": []
+        },
+        {
+          "name": "DESACTIVAR USUARIO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/5/deactivate",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "5",
+                "deactivate"
+              ]
+            }
           },
           "response": []
         }
@@ -304,11 +504,17 @@
           "name": "LISTAR TODAS LAS TAREAS",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{BASE_URL}}/tasks",
+              "raw": "{{URL_API}}/tasks",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
                 "tasks"
@@ -318,13 +524,216 @@
           "response": []
         },
         {
-          "name": "CREAR TAREAS",
+          "name": "CREAR TAREA (con comment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mi tarea de prueba\",\n  \"description\": \"Descripción de la tarea\",\n  \"status\": \"pendiente\",\n  \"comment\": \"Comentario inicial\",\n  \"assignedUsers\": [5]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR TAREA (comment vacío — bug fix)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tarea sin comentario\",\n  \"description\": \"Prueba del bug fix\",\n  \"status\": \"pendiente\",\n  \"comment\": \"\",\n  \"assignedUsers\": [2]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks"
+              ]
+            },
+            "description": "Prueba del fix del Issue #1.\n\nEnvía `comment: \"\"` (string vacío). Debe responder 201 y guardar NULL en la columna comment de MySQL.\n\nAntes del fix respondía 400."
+          },
+          "response": []
+        },
+        {
+          "name": "LISTAR TAREA POR ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/tasks/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR TAREA",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tarea actualizada\",\n  \"description\": \"Descripción actualizada\",\n  \"status\": \"en_progreso\",\n  \"comment\": \"Actualización del comentario\",\n  \"assignedUsers\": [2]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ELIMINAR TAREA",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/tasks/6",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "6"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR ESTADO TAREA",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"status\": \"en_progreso\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks/4/status",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "4",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "RBAC — ROLES Y PERMISOS",
+      "item": [
+        {
+          "name": "LOGIN Y VER ROLES EN RESPUESTA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.environment.set('ACCESS_TOKEN',  body.data.accessToken);",
+                  "    pm.environment.set('REFRESH_TOKEN', body.data.refreshToken);",
+                  "    console.log('Roles del usuario:', JSON.stringify(body.data.roles));",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{ \"title\": \"Mi tarea de prueba\", \"status\": \"pendiente\" }",
+              "raw": "{\n  \"email\": \"sebastian@sena.edu.co\",\n  \"password\": \"sebas123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -332,92 +741,33 @@
               }
             },
             "url": {
-              "raw": "{{BASE_URL}}/tasks",
+              "raw": "{{URL_API}}/auth/login",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
-                "tasks"
+                "auth",
+                "login"
               ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "LISTAR TAREAS POR ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{BASE_URL}}/tasks/17",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "tasks",
-                "17"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "ACTUALIZAR TAREAS",
-          "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"title\": \"Mi tarea de prueba ACTUALIZADA\", \"description\": \"Prueba\", \"status\": \"en_progreso\", \"comment\": \"Hola\", \"assignedUsers\": [16] }",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
             },
-            "url": {
-              "raw": "{{BASE_URL}}/tasks/17",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "tasks",
-                "17"
-              ]
-            }
+            "description": "Igual que el LOGIN de AUTENTICACIÓN pero imprime en consola el campo `roles` de la respuesta.\n\nUsar para verificar que el Issue #3 está correctamente implementado.\n\nLa respuesta debe incluir:\n```json\n{\n  \"data\": {\n    \"accessToken\": \"...\",\n    \"refreshToken\": \"...\",\n    \"user\": { ... },\n    \"roles\": [\n      { \"name\": \"admin\", \"permissions\": [\"tasks.create\", \"tasks.delete.all\", ...] }\n    ]\n  }\n}\n```"
           },
           "response": []
         },
         {
-          "name": "ELIMINAR TAREAS",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"title\": \"Tarea Actualizada\", \"status\": \"en_progreso\" }"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/tasks/3",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "tasks",
-                "3"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "ACTUALIZAR ESTADO TAREAS",
+          "name": "CAMBIO DE ROL → instructor",
           "request": {
             "method": "PATCH",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"status\": \"inventado\" }",
+              "raw": "{\n  \"role\": \"instructor\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -425,14 +775,83 @@
               }
             },
             "url": {
-              "raw": "{{BASE_URL}}/tasks/1/status",
+              "raw": "{{URL_API}}/users/2/role",
               "host": [
-                "{{BASE_URL}}"
+                "{{URL_API}}"
               ],
               "path": [
-                "tasks",
-                "1",
-                "status"
+                "users",
+                "2",
+                "role"
+              ]
+            },
+            "description": "Prueba que el schema ahora acepta el nuevo rol `instructor`.\n\nAntes del Issue #3 esto respondía 400 porque `instructor` no era un valor válido en el enum."
+          },
+          "response": []
+        },
+        {
+          "name": "CAMBIO DE ROL → user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/2/role",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "2",
+                "role"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CAMBIO DE ROL → admin",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/2/role",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "2",
+                "role"
               ]
             }
           },
@@ -446,9 +865,14 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{BASE_URL}}",
+          "raw": "http://localhost:3000/",
+          "protocol": "http",
           "host": [
-            "{{BASE_URL}}"
+            "localhost"
+          ],
+          "port": "3000",
+          "path": [
+            ""
           ]
         }
       },
@@ -460,8 +884,6 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "packages": {},
-        "requests": {},
         "exec": [
           ""
         ]
@@ -471,8 +893,6 @@
       "listen": "test",
       "script": {
         "type": "text/javascript",
-        "packages": {},
-        "requests": {},
         "exec": [
           ""
         ]
@@ -482,10 +902,10 @@
   "variable": [
     {
       "key": "URL_API",
-      "value": ""
+      "value": "http://localhost:3000/api"
     },
     {
-      "key": "ACCES_TOKEN",
+      "key": "ACCESS_TOKEN",
       "value": ""
     },
     {

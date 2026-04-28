@@ -241,3 +241,52 @@ export async function updateUserPassword(id, nuevaPasswordHasheada) {
     // Retornar el usuario con los datos actualizados
     return getUserById(id);
 }
+
+// ── DESACTIVAR USUARIO (DESACTIVACIÓN LÓGICA) ────────────────────────────────
+// Se usa desde el controlador deactivateUser en users.controller.js.
+// No elimina el usuario de la BD — solo cambia is_active a 0.
+// Esto preserva todas las tareas asociadas al usuario.
+//
+// Parámetro: id — id numérico del usuario a desactivar
+// Retorna: el usuario actualizado con is_active = 0, o null si no existe
+export async function deactivateUser(id) {
+    // Verificar que el usuario existe antes de intentar actualizar
+    const existente = await getUserById(id);
+    // Si no existe retornamos null para que el controlador responda 404
+    if (!existente) return null;
+
+    // UPDATE solo modifica is_active — no toca ningún otro campo del usuario
+    // El ? es el placeholder seguro de mysql2 (evita inyección SQL)
+    await pool.query(
+        'UPDATE users SET is_active = 0 WHERE id = ?',
+        [Number(id)]
+    );
+
+    // Retornar el usuario actualizado para que el controlador lo devuelva al cliente
+    return getUserById(id);
+}
+
+// ── CONTAR TAREAS PENDIENTES O EN PROGRESO DE UN USUARIO ─────────────────────
+// Se usa en el controlador deactivateUser para validar la regla de negocio:
+// "un usuario no puede desactivarse si tiene tareas pendientes o en progreso".
+//
+// Parámetro: userId — id numérico del usuario
+// Retorna: número de tareas activas (pendiente + en_progreso) del usuario
+//
+// NOTA: la tabla tasks guarda assigned_users como JSON (ej: "[1, 2, 3]").
+// Usamos JSON_CONTAINS para buscar el id del usuario dentro del JSON sin
+// tener que traer todos los registros a Node y filtrar en memoria.
+export async function countUserActiveTasks(userId) {
+    // JSON_CONTAINS(columna, valor, ruta) verifica si el JSON contiene el valor
+    // CAST(? AS JSON) convierte el id numérico a JSON para que la comparación funcione
+    // Se filtran solo los estados que bloquean la desactivación
+    const [rows] = await pool.query(
+        `SELECT COUNT(*) AS total
+         FROM tasks
+         WHERE (status = 'pendiente' OR status = 'en_progreso')
+           AND JSON_CONTAINS(assigned_users, CAST(? AS JSON), '$')`,
+        [Number(userId)]
+    );
+    // rows[0].total es el número de tareas activas — 0 significa que puede desactivarse
+    return rows[0].total;
+}

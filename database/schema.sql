@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS users (
     email       VARCHAR(100) NOT NULL,
     password    VARCHAR(255) NULL,
     role        VARCHAR(20)  NOT NULL DEFAULT 'user',
+    -- is_active: controla si el usuario puede ingresar al sistema
+    -- 1 = activo (puede iniciar sesión), 0 = desactivado (login bloqueado)
+    -- DEFAULT 1 garantiza que todos los usuarios nuevos empiezan activos
+    is_active   TINYINT(1)  NOT NULL DEFAULT 1,
     created_ud  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_up  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
