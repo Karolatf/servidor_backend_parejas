@@ -22,6 +22,10 @@ import {
     updateUser          as modifyUser,
     deleteUser          as removeUser,
     updateUserRole,                          // ← nueva función
+    // Funciones nuevas para la desactivación lógica de usuario
+    deactivateUser      as disableUser,     // marca is_active = 0 en la BD
+    countUserActiveTasks,                   // cuenta tareas pendientes/en_progreso del usuario
+    reactivateUser      as enableUser,      // marca is_active = 1 en la BD
 } from '../models/user.model.js';
 
 import { getTasksByUserId } from '../models/task.model.js';
@@ -199,4 +203,93 @@ export const changeUserPassword = catchAsync(async (req, res) => {
     await updateUserPassword(Number(id), nuevaPasswordHasheada);
  
     return successResponse(res, 'Contraseña actualizada correctamente', null);
+});
+
+// ── DESACTIVAR USUARIO ────────────────────────────────────────────────────────
+// PATCH /api/users/:id/deactivate
+//
+// Regla de negocio: un usuario solo puede desactivarse si NO tiene tareas
+// con estado 'pendiente' o 'en_progreso'. Si las tiene, se rechaza con 400.
+//
+// El usuario desactivado sigue existiendo en la BD (is_active = 0).
+// Sus tareas NO se eliminan — solo pierde acceso al sistema.
+// Solo el admin puede ejecutar esta acción (requireAdmin en la ruta).
+//
+// Flujo:
+//   1. Verificar que el usuario existe → 404 si no
+//   2. Contar tareas activas del usuario → 400 si tiene pendientes/en_progreso
+//   3. Desactivar (UPDATE is_active = 0) → 200 con el usuario actualizado
+export const deactivateUser = catchAsync(async (req, res) => {
+    // 1. Leer el id del parámetro de la URL (/api/users/5/deactivate → id = 5)
+    const { id } = req.params;
+
+    // 2. Verificar que el usuario existe en la BD antes de seguir
+    const usuario = await findUserById(id);
+    // findUserById retorna undefined si no encuentra el id — respondemos 404
+    if (!usuario) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // 3. Verificar si el usuario ya está desactivado para evitar operaciones redundantes
+    // is_active puede llegar como número (1/0) o booleano según la versión de mysql2
+    if (usuario.is_active === 0 || usuario.is_active === false) {
+        return errorResponse(res, 'El usuario ya está desactivado', 400);
+    }
+
+    // 4. Contar cuántas tareas activas tiene el usuario (pendiente + en_progreso)
+    // Si el conteo es mayor a 0, no se puede desactivar — regla de negocio
+    const tareasActivas = await countUserActiveTasks(id);
+    if (tareasActivas > 0) {
+        return errorResponse(
+            res,
+            `No se puede desactivar a ${usuario.name}: tiene ${tareasActivas} tarea(s) pendiente(s) o en progreso. Deben completarse primero.`,
+            400
+        );
+    }
+
+    // 5. Desactivar al usuario — disableUser hace UPDATE is_active = 0
+    const usuarioDesactivado = await disableUser(id);
+    // Si disableUser retorna null algo salió mal en el UPDATE
+    if (!usuarioDesactivado) {
+        return errorResponse(res, 'Error al desactivar el usuario', 500);
+    }
+
+    // 6. Responder con éxito y el objeto actualizado del usuario
+    return successResponse(
+        res,
+        `Usuario "${usuarioDesactivado.name}" desactivado correctamente`,
+        usuarioDesactivado
+    );
+});
+
+// ── REACTIVAR USUARIO ─────────────────────────────────────────────────────────
+// PATCH /api/users/:id/reactivate
+// Reactiva un usuario que fue desactivado previamente (is_active = 0 → 1).
+// Solo el admin puede ejecutar esta acción (requireAdmin en la ruta).
+// No tiene restricciones de tareas — se puede reactivar en cualquier momento.
+export const reactivateUser = catchAsync(async (req, res) => {
+    const { id } = req.params;
+
+    // Verificar que el usuario existe
+    const usuario = await findUserById(id);
+    if (!usuario) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // Verificar que el usuario esté efectivamente desactivado antes de reactivar
+    if (usuario.is_active === 1 || usuario.is_active === true) {
+        return errorResponse(res, 'El usuario ya está activo', 400);
+    }
+
+    // Reactivar — enableUser hace UPDATE is_active = 1
+    const usuarioReactivado = await enableUser(id);
+    if (!usuarioReactivado) {
+        return errorResponse(res, 'Error al reactivar el usuario', 500);
+    }
+
+    return successResponse(
+        res,
+        `Usuario "${usuarioReactivado.name}" reactivado correctamente`,
+        usuarioReactivado
+    );
 });

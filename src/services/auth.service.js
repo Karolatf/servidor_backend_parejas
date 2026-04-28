@@ -69,8 +69,30 @@ export async function loginService({ email, password }) {
     // INCORRECTO sería: getUserByDocumento(documento)
     const usuario = await getUserByEmail(email); // ← esta línea debe decir email, no documento
 
+    // Si el usuario no existe en la BD retornamos null — el controlador responde 401
     if (!usuario) return null;
     if (!usuario.password) return null;
+
+    // Verificar que el usuario esté activo antes de permitir el login
+    // is_active = 0 significa que el admin desactivó esta cuenta
+    // Lanzamos un Error con mensaje específico para diferenciarlo de "credenciales incorrectas"
+    // El controlador de auth capturará este Error y responderá con 403
+    if (usuario.is_active === 0 || usuario.is_active === false) {
+        // Construir el error de cuenta desactivada con las propiedades que
+        // errorMiddleware necesita leer correctamente.
+        // IMPORTANTE: usar 'status' (no 'statusCode') porque errorMiddleware
+        // lee error.status — si usamos statusCode el middleware devuelve 500
+        const errorDesactivado = new Error(
+            'Tu cuenta ha sido desactivada. Comunícate con el administrador del sistema.'
+        );
+        // code identifica este error específicamente en errorMiddleware
+        // para diferenciarlo de otros errores y responder con 403 (no 401 ni 500)
+        errorDesactivado.code   = 'ACCOUNT_DISABLED';
+        // status (sin "Code") es la propiedad que errorMiddleware lee en línea:
+        // const status = error.status || 500
+        errorDesactivado.status = 403;
+        throw errorDesactivado;
+    }
 
     // 2. Comparar contraseña con bcrypt
     const passwordCorrecta = await bcrypt.compare(password, usuario.password);
