@@ -10,73 +10,88 @@
 //   { "error": "Acceso denegado: El token ha expirado, inicie sesión nuevamente" }
 //   { "error": "Acceso denegado: Token inválido" }
 
+// jsonwebtoken es la librería que permite firmar y verificar tokens JWT
+// Se usa jwt.verify() para comprobar que el token no fue alterado y no expiró
 import jwt from 'jsonwebtoken';
 
-// verifyToken — se agrega como segundo argumento en las rutas a proteger:
-//   app.use('/api/tasks', verifyToken, tasksRouter)
+// verifyToken — middleware que protege rutas del backend
+// Se registra como segundo argumento en las rutas que requieren autenticación:
+//   router.get('/api/tasks', verifyToken, tasksController)
+// Express lo ejecuta ANTES del controlador cada vez que llega una petición
 //
 // Si el token es válido adjunta req.usuario con el payload decodificado
-// y llama a next() para continuar a la ruta.
+// y llama a next() para continuar al controlador.
 export function verifyToken(req, res, next) {
-    // El token viaja en el header: Authorization: Bearer <token>
+    // req.headers['authorization'] contiene el valor del header Authorization
+    // El frontend lo envía con el formato estándar: "Bearer eyJhbGci..."
     const authHeader = req.headers['authorization'];
 
-    // Si no viene el header o no tiene el formato "Bearer ..." se deniega el acceso
+    // Si el header no existe o no empieza con 'Bearer ', el cliente no envió token
+    // Respondemos 401 Unauthorized — el cliente no está identificado
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Acceso denegado: Token requerido' });
     }
 
-    // Se extrae solo el token (la parte después del espacio de "Bearer ")
+    // authHeader es "Bearer TOKEN" — split(' ')[1] extrae solo el TOKEN
+    // el índice [0] sería "Bearer" y [1] es el token JWT real
     const token = authHeader.split(' ')[1];
 
     try {
-        // jwt.verify lanza un error si el token es inválido o expiró
+        // jwt.verify hace dos cosas a la vez:
+        //   1. Verifica que la firma del token coincida con JWT_SECRET del .env
+        //   2. Verifica que el token no haya expirado (campo exp del payload)
+        // Si cualquiera de las dos falla, lanza un error y va al catch
         const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Se adjunta el payload al request para que los controladores lo usen
-        // Ejemplo de uso en un controlador: const { id, role } = req.usuario;
+        // Si llegamos aquí el token es válido — adjuntamos el payload al request
+        // El payload contiene: { id, documento, role, iat, exp }
+        // Los controladores acceden a req.usuario.id y req.usuario.role
         req.usuario = payload;
 
-        // Token válido — continuar al siguiente middleware o ruta
+        // next() le dice a Express que continúe al siguiente middleware o controlador
+        // Sin llamar a next() la petición quedaría colgada sin respuesta
         next();
 
     } catch (error) {
-        // TokenExpiredError se lanza cuando el tiempo de vida del token venció
+        // TokenExpiredError es el error específico de jsonwebtoken cuando el token expiró
+        // El campo exp del payload venció — el usuario debe hacer login de nuevo
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({
                 error: 'Acceso denegado: El token ha expirado, inicie sesión nuevamente',
             });
         }
-        // Cualquier otro error: firma inválida, token malformado, etc.
+        // Cualquier otro error significa que el token fue alterado o es inválido
+        // JsonWebTokenError cubre firma incorrecta, token malformado, etc.
         return res.status(401).json({ error: 'Acceso denegado: Token inválido' });
     }
 }
 
-// ── MIDDLEWARE: VERIFICAR QUE EL USUARIO ES ADMIN ────────────────────────────
-// Se usa como segundo middleware en rutas que solo los admin pueden usar.
-// Ejemplo de uso en la ruta: router.patch('/:id/role', verifyToken, requireAdmin, changeUserRole)
+// requireAdmin — middleware que verifica que el usuario autenticado sea admin
+// SIEMPRE se usa DESPUÉS de verifyToken, nunca solo
+// Ejemplo de uso: router.patch('/:id/role', verifyToken, requireAdmin, changeUserRole)
 //
 // verifyToken ya verificó la firma del JWT y adjuntó req.usuario al request.
 // requireAdmin solo verifica que req.usuario.role sea 'admin'.
 //
-// Si el usuario no es admin responde 403 Forbidden con mensaje en español.
-// 403 significa "autenticado pero sin permisos" (distinto de 401 "no autenticado").
+// 403 Forbidden significa "autenticado pero sin permisos"
+// Es distinto a 401 que significa "no autenticado"
 export function requireAdmin(req, res, next) {
 
-    // req.usuario fue adjuntado por verifyToken, que debe ejecutarse primero
-    // Si por alguna razón req.usuario no existe, denegar el acceso
+    // req.usuario fue adjuntado por verifyToken — si no existe algo falló en el orden
+    // Este guard evita un crash si se usa requireAdmin sin verifyToken antes
     if (!req.usuario) {
         return res.status(401).json({ error: 'Acceso denegado: Token requerido' });
     }
 
-    // Verificar que el rol en el payload del JWT sea 'admin'
-    // El role queda en el token al hacer login y no cambia hasta el próximo login
+    // El campo role viene del payload del JWT que se generó en el login
+    // Solo los usuarios con role === 'admin' pueden pasar este guard
     if (req.usuario.role !== 'admin') {
+        // 403 Forbidden: el usuario está autenticado pero no tiene permisos de admin
         return res.status(403).json({
             error: 'Acceso denegado: Se requieren permisos de administrador para esta acción',
         });
     }
 
-    // El usuario es admin — continuar al controlador
+    // El usuario es admin — continuar al controlador de la ruta
     next();
 }

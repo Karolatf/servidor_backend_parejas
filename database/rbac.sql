@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS permissions (
 -- TABLA: role_permissions
 -- Tabla pivote que materializa la relación M:N entre roles y permisos.
 -- Un rol puede tener múltiples permisos y un permiso puede estar en múltiples roles.
--- ON DELETE CASCADE: si se elimina un rol o permiso, se eliminan sus relaciones.
+-- ON DELETE RESTRICT: MySQL bloquea eliminar un rol o permiso que tenga relaciones activas.
+--   Esto obliga a limpiar las relaciones antes de eliminar el rol o permiso padre.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS role_permissions (
     role_id       INT NOT NULL,
@@ -61,12 +62,12 @@ CREATE TABLE IF NOT EXISTS role_permissions (
     CONSTRAINT fk_rp_role
         FOREIGN KEY (role_id)
         REFERENCES roles (id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
         ON UPDATE CASCADE,
     CONSTRAINT fk_rp_permission
         FOREIGN KEY (permission_id)
         REFERENCES permissions (id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
         ON UPDATE CASCADE
 );
 
@@ -74,7 +75,9 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 -- TABLA: user_roles
 -- Tabla pivote que materializa la relación M:N entre usuarios y roles.
 -- Un usuario puede tener múltiples roles (ej: admin Y instructor a la vez).
--- ON DELETE CASCADE: si se elimina un usuario, se eliminan sus asignaciones de rol.
+-- ON DELETE RESTRICT: MySQL bloquea eliminar un usuario o rol que tenga
+--   asignaciones activas en esta tabla. El admin debe desactivar al usuario
+--   en lugar de eliminarlo si tiene roles asignados.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id    INT NOT NULL,
@@ -84,12 +87,12 @@ CREATE TABLE IF NOT EXISTS user_roles (
     CONSTRAINT fk_ur_user
         FOREIGN KEY (user_id)
         REFERENCES users (id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
         ON UPDATE CASCADE,
     CONSTRAINT fk_ur_role
         FOREIGN KEY (role_id)
         REFERENCES roles (id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
         ON UPDATE CASCADE
 );
 
