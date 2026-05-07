@@ -12,6 +12,8 @@ import authRouter from './routes/auth.routes.js';
 import { verifyToken } from './middlewares/auth.middleware.js';
 import usersRouter from './routes/users.routes.js';
 import tasksRouter from './routes/tasks.routes.js';
+import calendarRouter from './routes/calendar.routes.js';
+import notesRouter from './routes/notes.routes.js';
 
 const app = express();
 
@@ -40,6 +42,8 @@ app.use('/api/auth', authRouter);
 // Rutas protegidas — verifyToken valida el JWT antes de llegar al controlador
 app.use('/api/users', verifyToken, usersRouter);
 app.use('/api/tasks', verifyToken, tasksRouter);
+app.use('/api/calendar', verifyToken, calendarRouter);
+app.use('/api/notes', verifyToken, notesRouter);
 
 // Middleware global de errores — debe registrarse DESPUÉS de todas las rutas
 // Si se registra antes, los errores de las rutas no llegarán aquí

@@ -176,17 +176,20 @@ export const getDashboard = catchAsync(async (req, res) => {
     // Se filtra cada estado para obtener su contador individual
     const pendientes  = tareas.filter(t => t.status === 'pendiente').length;
     const enProgreso  = tareas.filter(t => t.status === 'en_progreso').length;
-    // Cuarto estado: el usuario indica que terminó y espera revisión del admin
+    // Cuarto estado: el usuario indica que terminó y espera revisión del instructor
     const aprobacion  = tareas.filter(t => t.status === 'pendiente_aprobacion').length;
     const completadas = tareas.filter(t => t.status === 'completada').length;
+    // Quinto estado: tarea reprobada por nota < 70
+    const reprobadas  = tareas.filter(t => t.status === 'reprobada').length;
 
     const estadisticas = {
         total: tareas.length,
         pendientes,
         enProgreso,
-        // La propiedad "aprobacion" la lee cargarDashboard() en el frontend
         aprobacion,
         completadas,
+        // reprobadas: tareas calificadas con nota < 70 por el instructor
+        reprobadas,
     };
 
     return successResponse(

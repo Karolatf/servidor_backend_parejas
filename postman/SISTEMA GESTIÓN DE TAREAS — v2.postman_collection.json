@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "dc5b5aeb-c410-4357-8fc9-1c20e744a1c6",
-    "name": "SISTEMA GESTIÓN DE TAREAS",
-    "description": "Colección actualizada — Autenticación, RBAC, Recuperación de contraseña, Usuarios, Tareas",
+    "_postman_id": "c14e7c03-03bd-4be3-ac47-16146887d332",
+    "name": "SISTEMA GESTIÓN DE TAREAS — v2",
+    "description": "Colección actualizada — Autenticación, RBAC, Recuperación de contraseña, Usuarios, Tareas, Calendario de Eventos, Notas Personales.\n\nNuevos grupos en esta versión:\n• CALENDARIO — 6 endpoints (GET instructor, GET usuario, POST propio, POST estudiante, POST con tarea, DELETE)\n• NOTAS — 4 endpoints (GET, POST, POST sin color, DELETE)\n\nEndpoints actualizados:\n• USUARIOS: Eliminar Forzoso, Desactivar con motivo, Reactivar\n• TAREAS: calificación con grade + gradeReason, estado reprobada, dashboard, filter",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52923475"
   },
@@ -471,7 +471,42 @@
           "response": []
         },
         {
-          "name": "DESACTIVAR USUARIO",
+          "name": "ELIMINAR USUARIO FORZOSO",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"El usuario incumplió las normas del programa reiteradamente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/5/force",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "users",
+                "5",
+                "force"
+              ]
+            },
+            "description": "Eliminación permanente incluso si el usuario está activo.\nRequiere body.reason ≥ 10 caracteres.\nAntes de borrar, preserva el nombre en deleted_user_names de las tareas asignadas.\n\n400 si reason está ausente o < 10 chars.\n404 si el usuario no existe."
+          },
+          "response": []
+        },
+        {
+          "name": "DESACTIVAR USUARIO (con motivo)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -481,6 +516,15 @@
                 "type": "text"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Incumplimiento del reglamento académico\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
               "raw": "{{URL_API}}/users/5/deactivate",
               "host": [
@@ -491,7 +535,8 @@
                 "5",
                 "deactivate"
               ]
-            }
+            },
+            "description": "Desactiva al usuario (is_active = 0).\nAcepta body.reason opcional (mínimo 10 chars) — se persiste en deactivation_reason.\n\nImplementación de la issue P1.\n\n400 si el usuario ya está inactivo.\n400 si tiene tareas activas (pendiente / en_progreso)."
           },
           "response": []
         },
@@ -506,6 +551,15 @@
                 "type": "text"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Situación resuelta, usuario autorizado para continuar\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
               "raw": "{{URL_API}}/users/5/reactivate",
               "host": [
@@ -516,7 +570,8 @@
                 "5",
                 "reactivate"
               ]
-            }
+            },
+            "description": "Reactiva al usuario (is_active = 1).\nLimpia deactivation_reason y deactivation_date.\n\n400 si el usuario ya está activo."
           },
           "response": []
         }
@@ -727,6 +782,158 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "DASHBOARD (todas las tareas)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/tasks/dashboard",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "dashboard"
+              ]
+            },
+            "description": "Devuelve conteos globales: total, pendientes, enProgreso, aprobacion, completadas, reprobadas.\n\nUsado por el panel Admin. El panel Instructor filtra por rol en frontend.\nEl panel Usuario recibe las tareas del usuario directamente (no usa este endpoint)."
+          },
+          "response": []
+        },
+        {
+          "name": "FILTRAR TAREAS POR USUARIO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/tasks/filter",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "filter"
+              ]
+            },
+            "description": "GET /api/tasks/filter?userId=3\n\nDevuelve solo las tareas asignadas al userId especificado.\n\nUsar la variable de entorno o cambiar el query param manualmente."
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR TAREA CON CALIFICACIÓN",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"PRUEBA 1\",\n  \"status\": \"completada\",\n  \"grade\": 85,\n  \"gradeReason\": \"Excelente manejo de los temas tratados\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "1"
+              ]
+            },
+            "description": "Califica una tarea pasando grade (0–100) y gradeReason (motivo obligatorio al editar nota).\n\ngrade < 70  → status debe ser 'reprobada'\ngrade >= 70 → status debe ser 'completada'\n\nNuevos campos en esta milestone: grade (DECIMAL 5,2) y grade_reason (TEXT)."
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR TAREA — SOLO ESTADO (usuario)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pendiente_aprobacion\",\n  \"comment\": \"Terminé la tarea\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "1"
+              ]
+            },
+            "description": "El usuario entrega la tarea cambiando el estado a pendiente_aprobacion.\nSin grade ni gradeReason — solo el instructor puede calificar."
+          },
+          "response": []
+        },
+        {
+          "name": "ACTUALIZAR TAREA — REPROBADA",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"reprobada\",\n  \"grade\": 45,\n  \"gradeReason\": \"No cumplió con los requisitos mínimos del ejercicio\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/tasks/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "tasks",
+                "1"
+              ]
+            },
+            "description": "Quinta estado del sistema: reprobada.\ngrade < 70 activa este estado automáticamente desde el panel instructor.\n\nVerifica que task.schema.js acepta 'reprobada' en ESTADOS_VALIDOS."
+          },
+          "response": []
         }
       ]
     },
@@ -883,6 +1090,307 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "CALENDARIO",
+      "item": [
+        {
+          "name": "OBTENER EVENTOS DEL INSTRUCTOR",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/calendar/instructor",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar",
+                "instructor"
+              ]
+            },
+            "description": "Devuelve todos los eventos creados por el instructor autenticado.\nIncluye eventos propios (tipo='propio') y eventos para estudiantes (tipo='estudiante').\n\nCada evento incluye studentName y taskTitle si aplican."
+          },
+          "response": []
+        },
+        {
+          "name": "OBTENER EVENTOS DEL USUARIO (estudiante)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/calendar/usuario",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar",
+                "usuario"
+              ]
+            },
+            "description": "Devuelve todos los eventos visibles para el estudiante autenticado:\n1. Eventos que el instructor le asignó (student_id = userId)\n2. Eventos propios creados por el estudiante (instructor_id = userId AND tipo='propio')\n\nEl campo instructorId en cada evento permite al frontend saber si el usuario puede eliminarlo."
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR EVENTO PROPIO (instructor o usuario)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-05-15\",\n  \"title\": \"Revisión de avances del proyecto\",\n  \"tipo\": \"propio\",\n  \"color\": \"#6366f1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/calendar",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar"
+              ]
+            },
+            "description": "Crea un recordatorio personal.\ntipo='propio' → sin studentId.\ncolor sugerido para eventos propios: #6366f1 (índigo).\n\n400 si faltan date, title o tipo."
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR EVENTO PARA ESTUDIANTE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-05-20\",\n  \"title\": \"Entrega del módulo 3\",\n  \"tipo\": \"estudiante\",\n  \"studentId\": 3,\n  \"color\": \"#0ea5e9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/calendar",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar"
+              ]
+            },
+            "description": "Crea un evento asignado a un estudiante específico.\ntipo='estudiante' → studentId obligatorio.\ncolor sugerido para eventos de estudiante: #0ea5e9 (celeste).\n\nEl estudiante verá este evento en su propio calendario en modo lectura.\n\n400 si tipo='estudiante' y falta studentId."
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR EVENTO VINCULADO A TAREA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-05-22\",\n  \"title\": \"Fecha límite PRUEBA 1\",\n  \"tipo\": \"estudiante\",\n  \"studentId\": 3,\n  \"taskId\": 1,\n  \"color\": \"#0ea5e9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/calendar",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar"
+              ]
+            },
+            "description": "Evento con referencia a una tarea. El popover del calendario mostrará el título y estado de la tarea, y un botón 'Ver tarea'.\n\ntaskId es opcional — si la tarea se elimina, el evento queda sin tarea (FK ON DELETE SET NULL)."
+          },
+          "response": []
+        },
+        {
+          "name": "ELIMINAR EVENTO",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/calendar/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "calendar",
+                "1"
+              ]
+            },
+            "description": "Elimina un evento por ID.\nSolo puede eliminarlo el usuario que lo creó (campo instructor_id).\nEsto aplica tanto para el instructor como para el usuario que creó un evento propio.\n\n404 si el evento no existe o no pertenece al usuario autenticado."
+          },
+          "response": []
+        }
+      ],
+      "description": "Eventos del calendario del instructor y del usuario.\n\nFlujo:\n1. Instructor crea evento (propio o para estudiante)\n2. GET /calendar/usuario devuelve al estudiante los eventos que el instructor le asignó + sus propios recordatorios\n3. Instructor puede eliminar cualquier evento que él creó\n4. Usuario solo puede eliminar sus propios recordatorios (instructor_id = userId del token)"
+    },
+    {
+      "name": "NOTAS PERSONALES",
+      "item": [
+        {
+          "name": "OBTENER NOTAS DEL USUARIO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/notes",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "notes"
+              ]
+            },
+            "description": "Devuelve todas las notas personales del usuario autenticado.\nOrdenadas por created_at ASC.\n\nAntes de esta milestone las notas se guardaban en localStorage del navegador y se perdían al cambiar de dispositivo o limpiar el navegador."
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR NOTA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"Revisar el módulo 4 antes del jueves\",\n  \"color\": \"#fef3c7\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/notes",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "notes"
+              ]
+            },
+            "description": "Crea una nota personal.\ncolor valores válidos (pastel):\n  #fef3c7 → amarillo\n  #fce7f3 → rosa\n  #d1fae5 → verde\n  #dbeafe → celeste\n\n400 si texto está vacío."
+          },
+          "response": []
+        },
+        {
+          "name": "CREAR NOTA — SIN COLOR (usa default)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"Estudiar para el examen del módulo 2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{URL_API}}/notes",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "notes"
+              ]
+            },
+            "description": "Prueba que el color por defecto (#fef3c7 amarillo) se aplica cuando no se envía color.\n\nVerificar en BD que color = '#fef3c7'."
+          },
+          "response": []
+        },
+        {
+          "name": "ELIMINAR NOTA",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{ACCESS_TOKEN}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/notes/1",
+              "host": [
+                "{{URL_API}}"
+              ],
+              "path": [
+                "notes",
+                "1"
+              ]
+            },
+            "description": "Elimina una nota por ID.\nSolo puede eliminarla el dueño (user_id del token debe coincidir con user_id de la nota).\n\n404 si la nota no existe o no pertenece al usuario autenticado."
+          },
+          "response": []
+        }
+      ],
+      "description": "Notas personales del usuario. Migradas de localStorage al servidor en esta milestone.\n\nCada nota tiene texto libre y un color pastel elegido por el usuario.\nSe eliminan automáticamente si se elimina el usuario (FK CASCADE)."
     },
     {
       "name": "MENSAJE DE BIENVENIDA",

@@ -24,6 +24,7 @@ import {
     createUser,
     updateUser,
     deleteUser,
+    forceDeleteUser,
     getUserTasks,
     changeUserRole,          // ← nueva función
     changeUserPassword,
@@ -89,8 +90,13 @@ router.patch('/:id/deactivate',  requireAdmin, deactivateUser);
 // Reactivar usuario desactivado — solo admin, mismo patrón que deactivate
 router.patch('/:id/reactivate',  requireAdmin, reactivateUser);
 
-// DELETE /api/users/:id — elimina un usuario del sistema (no requiere validación de body)
+// DELETE /api/users/:id — elimina un usuario del sistema (requiere que esté inactivo)
 router.delete('/:id', deleteUser);
+
+// DELETE /api/users/:id/force — eliminación forzosa sin restricciones de estado ni tareas
+// Requiere body { reason } con al menos 10 caracteres para auditoría
+// Solo accesible para administradores (requireAdmin)
+router.delete('/:id/force', requireAdmin, forceDeleteUser);
 
 // PATCH /api/users/:id/role — cambia el rol de un usuario
 // verifyToken ya se aplica en app.js para todas las rutas /api/users

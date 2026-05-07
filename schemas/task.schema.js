@@ -11,8 +11,12 @@
 //   Se agrega "pendiente_aprobacion" como cuarto estado válido del sistema.
 //   Lo pone el usuario cuando considera que terminó su tarea y necesita
 //   que el admin la revise antes de marcarla como completada.
-//   Los cuatro estados siguen el flujo de trabajo del proyecto:
-//     pendiente → en_progreso → pendiente_aprobacion → completada
+//
+// ACTUALIZACIÓN v3.3.0:
+//   Se agrega "reprobada" como quinto estado válido del sistema.
+//   Lo asigna automáticamente el sistema cuando el instructor califica
+//   una tarea con nota menor a 70. El flujo completo es:
+//     pendiente → en_progreso → pendiente_aprobacion → completada | reprobada
 
 import { z } from 'zod';
 
@@ -23,6 +27,7 @@ const ESTADOS_VALIDOS = [
     'en_progreso',
     'pendiente_aprobacion',
     'completada',
+    'reprobada',   // asignado automáticamente cuando la nota es < 70
 ];
 
 // Esquema para CREAR una tarea — POST /api/tasks
@@ -46,14 +51,14 @@ export const createTaskSchema = z.object({
         .max(500, 'La descripción no puede exceder los 500 caracteres')
         .optional(),
 
-    // status: obligatorio, solo acepta los cuatro valores del sistema
-    // ACTUALIZACIÓN: se agrega "pendiente_aprobacion" como cuarto estado
+    // status: obligatorio, solo acepta los cinco valores del sistema
+    // ACTUALIZACIÓN: se agrega "reprobada" como quinto estado
     status: z.enum(
         ESTADOS_VALIDOS,
         {
             required_error:     'El estado de la tarea es obligatorio',
             invalid_type_error: 'El estado debe ser una cadena de texto',
-            message:            "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion' o 'completada'",
+            message:            "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion', 'completada' o 'reprobada'",
         }
     ),
 
@@ -74,6 +79,19 @@ export const createTaskSchema = z.object({
         .string({ invalid_type_error: 'El comentario debe ser una cadena de texto' })
         .max(500, 'El comentario no puede exceder los 500 caracteres')
         .optional(),
+
+    // grade: nota numérica del instructor (0-100) — opcional, solo instructores
+    grade: z
+        .number({ invalid_type_error: 'La nota debe ser un número' })
+        .min(0,   'La nota mínima es 0')
+        .max(100, 'La nota máxima es 100')
+        .nullable()
+        .optional(),
+
+    // gradeReason: motivo de la edición de nota — requerido cuando se envía grade
+    gradeReason: z
+        .string({ invalid_type_error: 'El motivo debe ser una cadena de texto' })
+        .optional(),
 });
 
 // Esquema para ACTUALIZAR una tarea completa — PUT /api/tasks/:id
@@ -81,14 +99,14 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = createTaskSchema.partial();
 
 // Esquema para CAMBIAR solo el estado — PATCH /api/tasks/:id/status
-// Solo acepta el campo status con los cuatro valores válidos del sistema
-// ACTUALIZACIÓN: se agrega "pendiente_aprobacion" al enum
+// Solo acepta el campo status con los cinco valores válidos del sistema
+// ACTUALIZACIÓN: se agrega "reprobada" al enum
 export const updateTaskStatusSchema = z.object({
     status: z.enum(
         ESTADOS_VALIDOS,
         {
             required_error: 'El estado es obligatorio',
-            message:        "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion' o 'completada'",
+            message:        "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion', 'completada' o 'reprobada'",
         }
     ),
 });
