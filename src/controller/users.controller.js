@@ -28,7 +28,7 @@ import {
     reactivateUser      as enableUser,      // marca is_active = 1 en la BD
 } from '../models/user.model.js';
 
-import { getTasksByUserId } from '../models/task.model.js';
+import { getTasksByUserId, registrarNombreUsuarioEliminado } from '../models/task.model.js';
 
 import bcrypt from 'bcryptjs';
 import { updateUserPassword } from '../models/user.model.js';
@@ -81,18 +81,32 @@ export const updateUser = catchAsync(async (req, res) => {
 });
 
 // DELETE /api/users/:id
-// Elimina un usuario y retorna confirmación
+// Borrado suave: marca el usuario como inactivo (is_active = 0) en vez de eliminarlo físicamente.
+// Preserva todos los datos históricos y la integridad referencial en las tareas.
+// Para eliminación permanente, usar DELETE /api/users/:id/force (solo emergencias).
 export const deleteUser = catchAsync(async (req, res) => {
-    const { id }           = req.params;
-    const usuarioEliminado = await removeUser(id);
+    const { id } = req.params;
 
-    if (!usuarioEliminado) {
+    // Verificar que el usuario existe
+    const usuario = await findUserById(id);
+    if (!usuario) {
         return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // Si ya está inactivo, no hacer nada innecesario
+    if (usuario.is_active === 0 || usuario.is_active === false) {
+        return errorResponse(res, `El usuario "${usuario.name}" ya está desactivado`, 400);
+    }
+
+    // Borrado suave: desactivar en lugar de eliminar
+    const usuarioDesactivado = await disableUser(id);
+    if (!usuarioDesactivado) {
+        return errorResponse(res, 'Error al desactivar el usuario', 500);
     }
 
     return successResponse(
         res,
-        `Usuario "${usuarioEliminado.name}" eliminado correctamente`
+        `Usuario "${usuarioDesactivado.name}" desactivado correctamente (borrado suave)`
     );
 });
 
@@ -291,5 +305,46 @@ export const reactivateUser = catchAsync(async (req, res) => {
         res,
         `Usuario "${usuarioReactivado.name}" reactivado correctamente`,
         usuarioReactivado
+    );
+});
+// ── ELIMINAR USUARIO FORZOSAMENTE ─────────────────────────────────────────────
+// DELETE /api/users/:id/force
+// Elimina un usuario sin importar su estado (activo/inactivo) ni tareas pendientes.
+// Solo el admin puede ejecutar esta acción (requireAdmin en la ruta).
+// Se requiere un motivo (reason) en el body para auditoría.
+//
+// Diferencias con DELETE /api/users/:id:
+//   - No verifica is_active — elimina activo o inactivo
+//   - No verifica tareas pendientes — elimina aunque tenga tareas
+//   - Requiere body { reason } como campo obligatorio de auditoría
+export const forceDeleteUser = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Validar que se envió un motivo — es obligatorio para auditoría
+    if (!reason || String(reason).trim().length < 10) {
+        return errorResponse(
+            res,
+            'El motivo de eliminación es obligatorio y debe tener al menos 10 caracteres',
+            400
+        );
+    }
+
+    // Verificar que el usuario existe
+    const usuario = await findUserById(id);
+    if (!usuario) {
+        return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
+    }
+
+    // BORRADO SUAVE PREVIO: guardar el nombre del usuario en todas las tareas
+    // que lo tienen asignado, para que sigan mostrando su nombre aunque ya no esté en la BD
+    await registrarNombreUsuarioEliminado(Number(id), usuario.name);
+
+    // Eliminar sin validaciones adicionales — cierre forzoso
+    await removeUser(id);
+
+    return successResponse(
+        res,
+        `Usuario "${usuario.name}" eliminado forzosamente. Motivo: ${reason.trim()}`
     );
 });

@@ -55,23 +55,32 @@ function deserializarUsuarios(valor) {
 //
 // Parámetro: filaDb — objeto raw devuelto por pool.query (nombres con underscore)
 // Retorna: objeto con nombres camelCase listo para enviar como JSON al frontend
+// parsearDeletedUserNames — convierte el campo deleted_user_names de MySQL a objeto JS
+// Necesario porque mysql2 puede devolver el JSON como string o como objeto según la versión
+// Retorna {} si el campo es null, undefined o no se puede parsear
+function parsearDeletedUserNames(valor) {
+    if (!valor) return {};
+    if (typeof valor === 'object') return valor;
+    try { return JSON.parse(valor); } catch { return {}; }
+}
+
 function formatearTarea(filaDb) {
-    // Si filaDb es undefined (tarea no encontrada), retornar null en lugar de crashear
     if (!filaDb) return null;
     return {
-        // Campos que no necesitan transformación de nombre
-        id:            filaDb.id,
-        title:         filaDb.title,
-        description:   filaDb.description,
-        status:        filaDb.status,
-        // comment: usa || null para convertir undefined a null de forma explícita
-        // Si la columna es NULL en MySQL, mysql2 lo devuelve como null de JS
-        comment:       filaDb.comment || null,
-        // assigned_users (snake_case de MySQL) → assignedUsers (camelCase del frontend)
-        // deserializarUsuarios convierte el JSON string '[1,2,3]' al arreglo [1,2,3]
-        assignedUsers: deserializarUsuarios(filaDb.assigned_users),
-        // created_ud (nombre de columna en la BD) → createdAt (camelCase del frontend)
-        createdAt:     filaDb.created_ud
+        id:               filaDb.id,
+        title:            filaDb.title,
+        description:      filaDb.description,
+        status:           filaDb.status,
+        comment:          filaDb.comment || null,
+        // grade: nota numérica (0-100) asignada por el instructor. null = sin calificar
+        grade:            filaDb.grade != null ? Number(filaDb.grade) : null,
+        // gradeReason: motivo de la última edición de nota por el instructor
+        gradeReason:      filaDb.grade_reason || null,
+        assignedUsers:    deserializarUsuarios(filaDb.assigned_users),
+        // deletedUserNames: mapa { "userId": "nombre" } de usuarios eliminados permanentemente
+        // Se rellena antes del hard delete para preservar el nombre aunque ya no esté en users
+        deletedUserNames: parsearDeletedUserNames(filaDb.deleted_user_names),
+        createdAt:        filaDb.created_ud
     };
 }
 
@@ -86,7 +95,7 @@ export async function getAllTasks() {
     const [rows]     = await pool.query('SELECT * FROM tasks');
     // Query 2: obtener id, name y documento de todos los usuarios para resolver los IDs
     // Solo se traen los campos necesarios, no todo el objeto usuario (evita exponer passwords)
-    const [usuarios] = await pool.query('SELECT id, name, documento FROM users');
+    const [usuarios] = await pool.query('SELECT id, name, documento, is_active FROM users');
 
     // Para cada tarea, resolver los IDs de usuarios asignados a nombres legibles
     return rows.map(function(fila) {
@@ -95,12 +104,15 @@ export async function getAllTasks() {
 
         // Resolver cada ID del arreglo assignedUsers al nombre del usuario correspondiente
         const nombres = tarea.assignedUsers.map(function(id) {
-            // find busca en el arreglo de usuarios el que tiene ese id
             const encontrado = usuarios.find(u => u.id === Number(id));
-            // Si el usuario existe retornar su nombre, si fue eliminado retornar null
-            return encontrado ? encontrado.name : null;
-        // filter(Boolean) elimina los null del arreglo (usuarios que ya no existen)
-        }).filter(Boolean);
+            if (!encontrado) {
+                // Buscar en el mapa de nombres de usuarios eliminados permanentemente
+                const nombreGuardado = tarea.deletedUserNames[String(id)];
+                return nombreGuardado ? `${nombreGuardado} (eliminado)` : `[Usuario eliminado]`;
+            }
+            if (encontrado.is_active === 0) return `${encontrado.name} (inactivo)`;
+            return encontrado.name;
+        });
 
         // assignedUsersDisplay: string con los nombres separados por coma
         // Si no hay usuarios asignados, null (el frontend muestra '—')
@@ -126,8 +138,28 @@ export async function getTaskById(id) {
         'SELECT * FROM tasks WHERE id = ?',
         [Number(id)]
     );
-    // formatearTarea retorna null si rows[0] es undefined (tarea no encontrada)
-    return formatearTarea(rows[0]);
+    if (!rows[0]) return null;
+
+    const tarea = formatearTarea(rows[0]);
+
+    // Resolver assignedUsersDisplay igual que getAllTasks
+    // Sin esto, GET /api/tasks/:id devuelve los IDs pero no los nombres
+    const [usuarios] = await pool.query('SELECT id, name, documento, is_active FROM users');
+    const nombres = tarea.assignedUsers.map(function(uid) {
+        const u = usuarios.find(u => u.id === Number(uid));
+        if (!u) {
+            const guardado = tarea.deletedUserNames[String(uid)];
+            return guardado ? `${guardado} (eliminado)` : '[Usuario eliminado]';
+        }
+        return u.is_active === 0 ? `${u.name} (inactivo)` : u.name;
+    });
+    tarea.assignedUsersDisplay = nombres.length > 0 ? nombres.join(', ') : null;
+    tarea.assignedDocumentos   = tarea.assignedUsers.map(function(uid) {
+        const u = usuarios.find(u => u.id === Number(uid));
+        return u ? u.documento.toString() : null;
+    }).filter(Boolean);
+
+    return tarea;
 }
 
 // createTask — inserta una tarea nueva en la tabla tasks
@@ -150,17 +182,15 @@ export async function createTask({
 }) {
     // INSERT con los 5 campos — el orden de los ? debe coincidir con VALUES
     const [result] = await pool.query(
-        'INSERT INTO tasks (title, description, status, assigned_users, comment) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO tasks (title, description, status, assigned_users, comment, grade, grade_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
             title,
-            // Si description no viene o es cadena vacía, guardar cadena vacía en MySQL
             description || '',
             status,
-            // serializarUsuarios convierte [1,2,3] a '[1,2,3]' para guardar como JSON en MySQL
             serializarUsuarios(assignedUsers),
-            // Si comment es cadena vacía lo convertimos a null para consistencia en la BD
-            // Una cadena vacía y null son equivalentes semánticamente en este contexto
-            comment || null
+            comment || null,
+            null,   // grade empieza null — se asigna cuando el instructor califica
+            null    // grade_reason empieza null
         ]
     );
     // result.insertId contiene el id AUTO_INCREMENT que MySQL asignó a la nueva fila
@@ -191,8 +221,11 @@ export async function updateTask(id, campos) {
     // serializarUsuarios convierte el arreglo JS al JSON string que guarda MySQL
     if (campos.assignedUsers !== undefined) camposDb.assigned_users = serializarUsuarios(campos.assignedUsers);
     // CORRECCIÓN: se permite actualizar el campo comment
-    // Se convierte cadena vacía a null para que MySQL guarde NULL, no una cadena vacía
     if (campos.comment !== undefined) camposDb.comment = campos.comment || null;
+    // grade: nota numérica del instructor (0-100) — null significa sin calificar
+    if (campos.grade !== undefined) camposDb.grade = (campos.grade !== null && campos.grade !== '') ? Number(campos.grade) : null;
+    // grade_reason: motivo de la última edición de nota — obligatorio cuando se edita grade
+    if (campos.gradeReason !== undefined) camposDb.grade_reason = campos.gradeReason || null;
 
     // Si no llegó ningún campo válido, no ejecutar el UPDATE innecesariamente
     // Retornar la tarea sin cambios
@@ -290,4 +323,42 @@ export async function removeUserFromTask(taskId, userId) {
 
     // Actualizar la tarea con el arreglo sin el usuario eliminado
     return updateTask(taskId, { assignedUsers: filtrados });
+}
+// registrarNombreUsuarioEliminado — guarda el nombre de un usuario en deleted_user_names
+// de TODAS las tareas que lo tienen asignado, antes de eliminarlo permanentemente.
+// Se llama desde forceDeleteUser en users.controller.js justo antes del DELETE.
+//
+// Parámetro: userId — id del usuario que se va a eliminar
+// Parámetro: userName — nombre del usuario a preservar
+// Retorna: número de tareas actualizadas
+export async function registrarNombreUsuarioEliminado(userId, userName) {
+    // Buscar todas las tareas que tienen este userId en su assigned_users JSON
+    const [rows] = await pool.query(
+        `SELECT id, deleted_user_names FROM tasks
+         WHERE JSON_CONTAINS(assigned_users, CAST(? AS JSON), '$')`,
+        [Number(userId)]
+    );
+
+    if (rows.length === 0) return 0;
+
+    // Para cada tarea, agregar la entrada { "userId": "nombre" } al mapa
+    for (const fila of rows) {
+        let mapa = {};
+        try {
+            if (fila.deleted_user_names) {
+                mapa = typeof fila.deleted_user_names === 'object'
+                    ? fila.deleted_user_names
+                    : JSON.parse(fila.deleted_user_names);
+            }
+        } catch { mapa = {}; }
+
+        mapa[String(userId)] = userName;
+
+        await pool.query(
+            'UPDATE tasks SET deleted_user_names = ? WHERE id = ?',
+            [JSON.stringify(mapa), fila.id]
+        );
+    }
+
+    return rows.length;
 }
