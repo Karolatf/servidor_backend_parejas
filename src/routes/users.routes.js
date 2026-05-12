@@ -90,8 +90,9 @@ router.patch('/:id/deactivate',  requireAdmin, deactivateUser);
 // Reactivar usuario desactivado — solo admin, mismo patrón que deactivate
 router.patch('/:id/reactivate',  requireAdmin, reactivateUser);
 
-// DELETE /api/users/:id — elimina un usuario del sistema (requiere que esté inactivo)
-router.delete('/:id', deleteUser);
+// DELETE /api/users/:id — eliminación estándar: borra de la BD si el usuario
+// no tiene tareas pendientes/en_progreso. Requiere body { reason } y rol admin.
+router.delete('/:id', requireAdmin, deleteUser);
 
 // DELETE /api/users/:id/force — eliminación forzosa sin restricciones de estado ni tareas
 // Requiere body { reason } con al menos 10 caracteres para auditoría
