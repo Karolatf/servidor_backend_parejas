@@ -163,6 +163,17 @@ export async function deleteUser(id) {
     // DELETE con placeholder seguro — elimina la fila de la tabla users
     await pool.query('DELETE FROM users WHERE id = ?', [Number(id)]);
 
+    // Issue 3: Forzar el contador AUTO_INCREMENT al máximo ID actual + 1
+    // para que MySQL nunca reutilice el ID del usuario eliminado.
+    // Se hace en dos pasos porque MySQL NO permite SELECT sobre la misma tabla
+    // dentro de un ALTER TABLE en la misma sentencia (error 1093).
+    // Paso 1: leer el MAX(id) actual con una query normal
+    const [[{ maxId }]] = await pool.query(
+        'SELECT COALESCE(MAX(id), 0) AS maxId FROM users'
+    );
+    // Paso 2: ALTER TABLE con el valor numérico ya calculado (no un subquery)
+    await pool.query(`ALTER TABLE users AUTO_INCREMENT = ${maxId + 1}`);
+
     // Retornamos el objeto del usuario antes de que se eliminara
     // El controlador lo envía como respuesta para confirmar qué se borró
     return aEliminar;
@@ -275,19 +286,21 @@ export async function updateUserPassword(id, nuevaPasswordHasheada) {
 // No elimina el usuario de la BD — preserva todas sus tareas y datos históricos
 // Se usa desde deactivateUser en users.controller.js (PATCH /api/users/:id/deactivate)
 //
+// Issue 4: ahora persiste deactivation_reason y deactivation_date = NOW()
 // Parámetro: id — id numérico del usuario a desactivar
+// Parámetro: reason — motivo de desactivación ingresado por el admin (puede ser undefined)
 // Retorna: el usuario actualizado con is_active = 0, o null si no existe
-export async function deactivateUser(id) {
+export async function deactivateUser(id, reason) {
     // Verificar que el usuario existe antes de intentar actualizar
     const existente = await getUserById(id);
     // Si no existe retornamos null para que el controlador responda 404
     if (!existente) return null;
 
-    // UPDATE solo modifica is_active = 0 — no toca ningún otro campo del usuario
-    // El ? es el placeholder seguro de mysql2 que evita SQL injection
+    // UPDATE persiste is_active = 0 + motivo + fecha actual
+    // El ? de reason puede recibir null si el controlador no lo envía — MySQL lo acepta
     await pool.query(
-        'UPDATE users SET is_active = 0 WHERE id = ?',
-        [Number(id)]
+        'UPDATE users SET is_active = 0, deactivation_reason = ?, deactivation_date = NOW() WHERE id = ?',
+        [reason || null, Number(id)]
     );
 
     // Retornar el usuario actualizado para que el controlador lo devuelva al cliente

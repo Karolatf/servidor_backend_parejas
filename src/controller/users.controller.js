@@ -81,11 +81,28 @@ export const updateUser = catchAsync(async (req, res) => {
 });
 
 // DELETE /api/users/:id
-// Borrado suave: marca el usuario como inactivo (is_active = 0) en vez de eliminarlo físicamente.
-// Preserva todos los datos históricos y la integridad referencial en las tareas.
-// Para eliminación permanente, usar DELETE /api/users/:id/force (solo emergencias).
+// Eliminación estándar: borra el usuario de la BD permanentemente,
+// pero SOLO si no tiene tareas con estado 'pendiente' o 'en_progreso'.
+// Si las tiene, responde 400 indicando cuántas tareas deben completarse primero.
+// Antes de eliminar, persiste el nombre del usuario en las tareas que lo tenían
+// asignado (igual que el cierre forzoso) para preservar el historial.
+// Requiere body { reason } con al menos 10 caracteres para auditoría.
+//
+// Diferencia con DELETE /api/users/:id/force:
+//   - Este SÍ verifica tareas activas (pendiente / en_progreso) → 400 si las hay
+//   - /force elimina sin importar estado ni tareas pendientes
 export const deleteUser = catchAsync(async (req, res) => {
     const { id } = req.params;
+    const { reason } = req.body;
+
+    // Validar que se envió un motivo — es obligatorio para auditoría
+    if (!reason || String(reason).trim().length < 10) {
+        return errorResponse(
+            res,
+            'El motivo de eliminación es obligatorio y debe tener al menos 10 caracteres',
+            400
+        );
+    }
 
     // Verificar que el usuario existe
     const usuario = await findUserById(id);
@@ -93,21 +110,34 @@ export const deleteUser = catchAsync(async (req, res) => {
         return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
     }
 
-    // Si ya está inactivo, no hacer nada innecesario
-    if (usuario.is_active === 0 || usuario.is_active === false) {
-        return errorResponse(res, `El usuario "${usuario.name}" ya está desactivado`, 400);
+    // Verificar que no tenga tareas activas — regla de negocio de la eliminación estándar
+    const tareasActivas = await countUserActiveTasks(id);
+    if (tareasActivas > 0) {
+        return errorResponse(
+            res,
+            `No se puede eliminar a ${usuario.name}: tiene ${tareasActivas} tarea(s) pendiente(s) o en progreso. Completa las tareas primero o usa el cierre forzoso.`,
+            400
+        );
     }
 
-    // Borrado suave: desactivar en lugar de eliminar
-    const usuarioDesactivado = await disableUser(id);
-    if (!usuarioDesactivado) {
-        return errorResponse(res, 'Error al desactivar el usuario', 500);
-    }
+    // Eliminar permanentemente de la BD
+    await removeUser(id);
 
-    return successResponse(
+    // Responder al cliente de inmediato — el trabajo de auditoría va en background
+    successResponse(
         res,
-        `Usuario "${usuarioDesactivado.name}" desactivado correctamente (borrado suave)`
+        `Usuario "${usuario.name}" eliminado correctamente. Motivo: ${String(reason).trim()}`
     );
+
+    // BACKGROUND: guardar el nombre del usuario eliminado en las tareas que lo tenían
+    // asignado, para que sigan mostrando su nombre aunque ya no esté en la BD.
+    setImmediate(async () => {
+        try {
+            await registrarNombreUsuarioEliminado(Number(id), usuario.name);
+        } catch (err) {
+            console.error(`[deleteUser] Error en background al registrar nombre de usuario ${id}:`, err);
+        }
+    });
 });
 
 // GET /api/users/by-document/:documento
@@ -236,6 +266,8 @@ export const changeUserPassword = catchAsync(async (req, res) => {
 export const deactivateUser = catchAsync(async (req, res) => {
     // 1. Leer el id del parámetro de la URL (/api/users/5/deactivate → id = 5)
     const { id } = req.params;
+    // Issue 4: leer el motivo del body para persistirlo en deactivation_reason
+    const { reason } = req.body;
 
     // 2. Verificar que el usuario existe en la BD antes de seguir
     const usuario = await findUserById(id);
@@ -261,8 +293,9 @@ export const deactivateUser = catchAsync(async (req, res) => {
         );
     }
 
-    // 5. Desactivar al usuario — disableUser hace UPDATE is_active = 0
-    const usuarioDesactivado = await disableUser(id);
+    // 5. Desactivar al usuario — disableUser hace UPDATE is_active = 0 + persiste reason y date
+    // Issue 4: se pasa reason para que el modelo lo guarde en deactivation_reason
+    const usuarioDesactivado = await disableUser(id, reason || null);
     // Si disableUser retorna null algo salió mal en el UPDATE
     if (!usuarioDesactivado) {
         return errorResponse(res, 'Error al desactivar el usuario', 500);
@@ -336,15 +369,26 @@ export const forceDeleteUser = catchAsync(async (req, res) => {
         return errorResponse(res, `Usuario con id ${id} no encontrado`, 404);
     }
 
-    // BORRADO SUAVE PREVIO: guardar el nombre del usuario en todas las tareas
-    // que lo tienen asignado, para que sigan mostrando su nombre aunque ya no esté en la BD
-    await registrarNombreUsuarioEliminado(Number(id), usuario.name);
-
     // Eliminar sin validaciones adicionales — cierre forzoso
+    // Se elimina PRIMERO para que el frontend reciba la respuesta de inmediato
     await removeUser(id);
 
-    return successResponse(
+    // Responder al cliente YA — sin esperar el trabajo de auditoría de tareas
+    // Esto evita que la UI se quede bloqueada hasta que terminen los UPDATEs de tareas
+    successResponse(
         res,
         `Usuario "${usuario.name}" eliminado forzosamente. Motivo: ${reason.trim()}`
     );
+
+    // BORRADO SUAVE EN BACKGROUND: guardar el nombre del usuario eliminado en las tareas
+    // que lo tenían asignado, para que sigan mostrando su nombre aunque ya no esté en la BD.
+    // setImmediate garantiza que este trabajo ocurre DESPUÉS de enviar la respuesta HTTP,
+    // sin bloquear el event loop ni al cliente.
+    setImmediate(async () => {
+        try {
+            await registrarNombreUsuarioEliminado(Number(id), usuario.name);
+        } catch (err) {
+            console.error(`[forceDeleteUser] Error en background al registrar nombre de usuario ${id}:`, err);
+        }
+    });
 });

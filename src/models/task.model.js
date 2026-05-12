@@ -180,6 +180,23 @@ export async function createTask({
     assignedUsers = [],
     comment       = null
 }) {
+    // Validar que ninguno de los usuarios asignados esté inactivo
+    if (assignedUsers && assignedUsers.length > 0) {
+        const [usuarios] = await pool.query(
+            'SELECT id, name, is_active FROM users WHERE id IN (?)',
+            [assignedUsers]
+        );
+        const inactivos = usuarios.filter(u => u.is_active === 0);
+        if (inactivos.length > 0) {
+            const nombres = inactivos.map(u => u.name).join(', ');
+            const err = new Error(
+                `No se puede crear la tarea: el siguiente usuario está inactivo y no puede recibir tareas: ${nombres}`
+            );
+            err.status = 400;
+            throw err;
+        }
+    }
+
     // INSERT con los 5 campos — el orden de los ? debe coincidir con VALUES
     const [result] = await pool.query(
         'INSERT INTO tasks (title, description, status, assigned_users, comment, grade, grade_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
