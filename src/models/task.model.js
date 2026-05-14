@@ -66,19 +66,21 @@ function parsearDeletedUserNames(valor) {
 
 function formatearTarea(filaDb) {
     if (!filaDb) return null;
+    const grade = filaDb.grade != null ? Number(filaDb.grade) : null;
+    // Si la tarea tiene nota, el estado se recalcula automáticamente para evitar inconsistencias
+    // que puedan haber quedado en la BD (ej. grade=100 con status='reprobada')
+    const status = grade !== null
+        ? (grade < 70 ? 'reprobada' : 'completada')
+        : filaDb.status;
     return {
         id:               filaDb.id,
         title:            filaDb.title,
         description:      filaDb.description,
-        status:           filaDb.status,
+        status,
         comment:          filaDb.comment || null,
-        // grade: nota numérica (0-100) asignada por el instructor. null = sin calificar
-        grade:            filaDb.grade != null ? Number(filaDb.grade) : null,
-        // gradeReason: motivo de la última edición de nota por el instructor
+        grade,
         gradeReason:      filaDb.grade_reason || null,
         assignedUsers:    deserializarUsuarios(filaDb.assigned_users),
-        // deletedUserNames: mapa { "userId": "nombre" } de usuarios eliminados permanentemente
-        // Se rellena antes del hard delete para preservar el nombre aunque ya no esté en users
         deletedUserNames: parsearDeletedUserNames(filaDb.deleted_user_names),
         createdAt:        filaDb.created_ud
     };
@@ -233,15 +235,21 @@ export async function updateTask(id, campos) {
     // Verificar campo por campo si llegó en el body (undefined = no enviar)
     if (campos.title         !== undefined) camposDb.title          = campos.title;
     if (campos.description   !== undefined) camposDb.description    = campos.description;
-    if (campos.status        !== undefined) camposDb.status         = campos.status;
+    // status: se aplica solo si no viene grade (grade siempre prevalece)
+    if (campos.status !== undefined && campos.grade === undefined) camposDb.status = campos.status;
     // assignedUsers del frontend → assigned_users en MySQL (snake_case de la BD)
-    // serializarUsuarios convierte el arreglo JS al JSON string que guarda MySQL
     if (campos.assignedUsers !== undefined) camposDb.assigned_users = serializarUsuarios(campos.assignedUsers);
-    // CORRECCIÓN: se permite actualizar el campo comment
+    // comment
     if (campos.comment !== undefined) camposDb.comment = campos.comment || null;
-    // grade: nota numérica del instructor (0-100) — null significa sin calificar
-    if (campos.grade !== undefined) camposDb.grade = (campos.grade !== null && campos.grade !== '') ? Number(campos.grade) : null;
-    // grade_reason: motivo de la última edición de nota — obligatorio cuando se edita grade
+    // grade: cuando se actualiza, el estado se recalcula automáticamente para mantener consistencia
+    // grade < 70 → reprobada | grade >= 70 → completada (nunca quedan desincronizados)
+    if (campos.grade !== undefined) {
+        camposDb.grade  = (campos.grade !== null && campos.grade !== '') ? Number(campos.grade) : null;
+        if (camposDb.grade !== null) {
+            camposDb.status = camposDb.grade < 70 ? 'reprobada' : 'completada';
+        }
+    }
+    // grade_reason: motivo de la última edición de nota
     if (campos.gradeReason !== undefined) camposDb.grade_reason = campos.gradeReason || null;
 
     // Si no llegó ningún campo válido, no ejecutar el UPDATE innecesariamente
