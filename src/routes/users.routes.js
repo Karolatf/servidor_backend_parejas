@@ -42,7 +42,7 @@ import {
     updateUserSchema,
 } from '../../schemas/user.schema.js';
 
-import { requireAdmin } from '../middlewares/auth.middleware.js';
+import { requireAdmin, requireAdminOrInstructor } from '../middlewares/auth.middleware.js';
 import { changeRoleSchema } from '../../schemas/user.schema.js';
 
 import { verifyToken } from '../middlewares/auth.middleware.js';
@@ -51,23 +51,24 @@ const router = Router();
 
 // ── RUTAS SIN PARÁMETRO DINÁMICO ─────────────────────────────────────────────
 
-// GET  /api/users — lista todos los usuarios del sistema (no requiere validación)
-router.get('/', getUsers);
+// GET  /api/users — lista todos los usuarios (solo admin e instructor)
+router.get('/', requireAdminOrInstructor, getUsers);
 
-// POST /api/users — crea un usuario nuevo
+// POST /api/users — crea un usuario nuevo (solo admin)
 // validateSchema(createUserSchema) valida documento, name y email antes de crear
-router.post('/', validateSchema(createUserSchema), createUser);
+router.post('/', requireAdmin, validateSchema(createUserSchema), createUser);
 
 // ── RUTAS CON SEGMENTO FIJO AL FINAL (van ANTES de /:id) ─────────────────────
 
 // GET /api/users/by-document/:documento — busca un usuario por su número de documento.
 // CRÍTICO: va ANTES de /:id para que Express no interprete "by-document" como un id.
-router.get('/by-document/:documento', getUserByDocumento);
+router.get('/by-document/:documento', requireAdminOrInstructor, getUserByDocumento);
 
 // GET /api/users/:userId/tasks — retorna todas las tareas asignadas a un usuario.
+// Solo admin e instructor pueden ver las tareas de otros usuarios.
 // CORRECCIÓN: esta ruta va ANTES de /:id para que Express no interprete
 // el segmento "tasks" como el valor del parámetro id.
-router.get('/:userId/tasks', getUserTasks);
+router.get('/:userId/tasks', requireAdminOrInstructor, getUserTasks);
 
 // ── RUTAS CON PARÁMETRO DINÁMICO /:id (van DESPUÉS de las específicas) ────────
 
@@ -76,12 +77,12 @@ router.get('/:userId/tasks', getUserTasks);
 // Solo el usuario dueño del token puede cambiar su propia contraseña
 router.patch('/:id/password', verifyToken, changeUserPassword);
 
-// GET    /api/users/:id — obtiene un usuario por su id numérico (no requiere validación)
-router.get('/:id', getUserById);
+// GET    /api/users/:id — obtiene un usuario por su id numérico (solo admin e instructor)
+router.get('/:id', requireAdminOrInstructor, getUserById);
 
-// PUT    /api/users/:id — actualiza los datos de un usuario existente
+// PUT    /api/users/:id — actualiza los datos de un usuario (solo admin)
 // updateUserSchema usa .partial() — los campos son opcionales pero si vienen, se validan
-router.put('/:id', validateSchema(updateUserSchema), updateUser);
+router.put('/:id', requireAdmin, validateSchema(updateUserSchema), updateUser);
 
 // PATCH /api/users/:id/deactivate — desactiva un usuario (is_active = 0)
 // Solo el admin puede ejecutar esta acción — requireAdmin verifica el rol del token

@@ -95,3 +95,21 @@ export function requireAdmin(req, res, next) {
     // El usuario es admin — continuar al controlador de la ruta
     next();
 }
+
+// requireAdminOrInstructor — permite el acceso solo a admin e instructor
+// Se usa en endpoints que ambos roles pueden usar (ej: listar usuarios, crear tareas)
+// SIEMPRE se usa DESPUÉS de verifyToken (app.js lo aplica globalmente a /api/*)
+export function requireAdminOrInstructor(req, res, next) {
+    if (!req.usuario) {
+        return res.status(401).json({ error: 'Acceso denegado: Token requerido' });
+    }
+
+    const { role } = req.usuario;
+    if (role !== 'admin' && role !== 'instructor') {
+        return res.status(403).json({
+            error: 'Acceso denegado: Se requieren permisos de administrador o instructor para esta acción',
+        });
+    }
+
+    next();
+}

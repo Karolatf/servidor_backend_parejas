@@ -40,24 +40,29 @@ export const getEventosUsuario = catchAsync(async (req, res) => {
 // POST /api/calendar
 // Crea un evento nuevo.
 // Body esperado: { date, title, tipo, studentId?, taskId?, color? }
-//   tipo: 'propio' (sin estudiante) | 'estudiante' (asignado a un estudiante)
+//   tipo: 'propio' (sin estudiante) | 'estudiante' (asignado a un estudiante, solo instructor)
 export const crearEvento = catchAsync(async (req, res) => {
-    const instructorId = req.usuario.id;
+    const creadorId = req.usuario.id;
+    const creadorRol = req.usuario.role;
     const { date, title, tipo, studentId, taskId, color } = req.body;
 
     // Validaciones básicas
     if (!date || !title || !tipo) {
         return errorResponse(res, 'Los campos date, title y tipo son obligatorios', 400);
     }
-    if (tipo === 'estudiante' && !studentId) {
-        return errorResponse(res, 'Para eventos de tipo estudiante, studentId es obligatorio', 400);
-    }
     if (!['propio', 'estudiante'].includes(tipo)) {
         return errorResponse(res, "El tipo debe ser 'propio' o 'estudiante'", 400);
     }
+    // Solo instructor puede crear eventos asignados a estudiantes
+    if (tipo === 'estudiante' && creadorRol !== 'instructor' && creadorRol !== 'admin') {
+        return errorResponse(res, 'Solo el instructor puede asignar eventos a estudiantes', 403);
+    }
+    if (tipo === 'estudiante' && !studentId) {
+        return errorResponse(res, 'Para eventos de tipo estudiante, studentId es obligatorio', 400);
+    }
 
     const nuevoEvento = await insertEvento({
-        instructorId,
+        instructorId: creadorId,
         studentId: tipo === 'estudiante' ? studentId : null,
         taskId:    taskId || null,
         date,

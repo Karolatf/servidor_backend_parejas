@@ -18,16 +18,18 @@ import {
     eliminarEvento,
 } from '../controller/calendar.controller.js';
 
+import { requireAdminOrInstructor } from '../middlewares/auth.middleware.js';
+
 const router = Router();
 
 // ── RUTAS SIN PARÁMETRO DINÁMICO (van PRIMERO) ─────────────────────────────
 
 // GET /api/calendar/instructor
-// El instructor obtiene sus propios eventos (propios + para estudiantes)
-router.get('/instructor', getEventosInstructor);
+// Solo admin e instructor pueden ver los eventos creados por el instructor
+router.get('/instructor', requireAdminOrInstructor, getEventosInstructor);
 
 // GET /api/calendar/usuario
-// El usuario/estudiante obtiene los eventos que el instructor le asignó
+// El usuario/estudiante obtiene los eventos que el instructor le asignó (accesible por todos)
 router.get('/usuario', getEventosUsuario);
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
