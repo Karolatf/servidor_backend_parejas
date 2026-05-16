@@ -1,50 +1,53 @@
 // MÓDULO: services/email.service.js
 // CAPA: Servicios
-
+//
 // Responsabilidad única: configurar y enviar correos con Mailtrap vía SMTP.
 // Usa nodemailer como cliente SMTP.
-
-// Por qué nodemailer + Mailtrap SMTP:
+//
+// Por qué nodemailer + Mailtrap:
 //   Mailtrap es un servicio de "email testing" que intercepta los correos
-//   y los muestra en su panel en lugar de enviarlos a casillas reales.
-//   Es ideal para proyectos de desarrollo como este, donde no se quiere
-//   enviar correos reales durante las pruebas.
+//   y los muestra en su panel web en lugar de enviarlos a casillas reales.
+//   Es ideal para proyectos de desarrollo como este donde no queremos
+//   enviar correos reales durante las pruebas del sistema.
+//
+// Las credenciales vienen del archivo .env para que no queden
+// expuestas en el código fuente ni sean visibles en GitHub.
 
-// Las credenciales vienen de variables de entorno (.env) para que no queden
-// expuestas en el código fuente y no sean visibles en GitHub.
- 
+// Importamos nodemailer que es la librería de Node.js para enviar correos vía SMTP
 import nodemailer from 'nodemailer';
- 
-// Crear el transporter de nodemailer con la configuración SMTP de Mailtrap.
-// process.env lee las variables del archivo .env (cargado por dotenv en app.js).
-// Cada variable tiene un valor de fallback para evitar errores si .env no existe.
+
+// Creamos el transporter de nodemailer que es el objeto que sabe conectarse al servidor SMTP de Mailtrap
+// process.env lee las variables del archivo .env que dotenv cargó al iniciar la aplicación
+// El operador || provee un valor de respaldo si la variable no está definida en el .env
 const transporter = nodemailer.createTransport({
+    // host: el servidor SMTP de Mailtrap — sandbox intercepta los correos sin enviarlos a nadie real
     host:   process.env.MAILTRAP_HOST || 'sandbox.smtp.mailtrap.io',
+    // port: el puerto SMTP que usa Mailtrap — puede ser 2525, 465 o 587 según la configuración
     port:   Number(process.env.MAILTRAP_PORT) || 2525,
     auth: {
+        // user y pass: las credenciales de acceso al inbox de Mailtrap — vienen del .env
         user: process.env.MAILTRAP_USER || '',
         pass: process.env.MAILTRAP_PASS || '',
     },
 });
- 
-// enviarCodigoRecuperacion — envía el correo con el código de 6 dígitos.
 
-// Parámetro: destinatario — el email del usuario que solicita recuperación
-// Parámetro: codigo — el código de 6 dígitos generado en resetCodes.js
-
-// Retorna: true si el correo se envió correctamente, false si hubo un error.
-// El caller (controlador) decide qué responder al cliente según el retorno.
+// ── enviarCodigoRecuperacion ──────────────────────────────────────────────────
+// Exportamos la función enviarCodigoRecuperacion que recibe el correo del usuario
+// y el código de 6 dígitos generado en resetCodes.js, y envía el email de recuperación
+// Retorna true si el correo se envió correctamente, false si hubo algún error
 export async function enviarCodigoRecuperacion(destinatario, codigo) {
     try {
-        // mailOptions define el encabezado y el cuerpo del correo
+        // Construimos el objeto mailOptions con todos los campos del correo a enviar
         const mailOptions = {
-            // from: dirección de origen visible para el destinatario
+            // from: el nombre y dirección del remitente que verá el destinatario en su correo
             from:    `"Task App SENA" <${process.env.MAILTRAP_FROM || 'noreply@taskapp.sena.edu.co'}>`,
+            // to: la dirección de correo del usuario que solicitó la recuperación
             to:      destinatario,
+            // subject: el asunto del correo que aparece en la bandeja de entrada
             subject: 'Código de recuperación de contraseña — Task App',
-            // text: versión en texto plano del correo (para clientes que no soportan HTML)
+            // text: versión en texto plano para clientes de correo que no soportan HTML
             text: `Tu código de recuperación es: ${codigo}\n\nEste código vence en 15 minutos.\nSi no solicitaste este correo, ignóralo.`,
-            // html: versión enriquecida con estilo básico para mejor presentación en Mailtrap
+            // html: versión con estilos visuales para que el correo se vea bien en Mailtrap
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px;">
                     <h2 style="color: #059669; margin-top: 0;">Task App — Recuperación de Contraseña</h2>
@@ -60,16 +63,18 @@ export async function enviarCodigoRecuperacion(destinatario, codigo) {
                 </div>
             `,
         };
- 
-        // transporter.sendMail envía el correo y retorna información sobre el envío.
-        // En Mailtrap el correo aparece en el inbox configurado.
+
+        // Llamamos a transporter.sendMail que envía el correo al servidor SMTP de Mailtrap
+        // En el panel de Mailtrap el correo aparece en el inbox para revisarlo visualmente
         await transporter.sendMail(mailOptions);
+        // Retornamos true para indicar al controlador que el envío fue exitoso
         return true;
- 
+
     } catch (error) {
-        // Si el envío falla (credenciales incorrectas, Mailtrap caído, etc.)
-        // se registra el error en consola sin romper el servidor
+        // Si el envío falla (credenciales incorrectas, Mailtrap caído, problema de red, etc.)
+        // registramos el error en consola para debuggear sin romper el servidor
         console.error('enviarCodigoRecuperacion: error al enviar correo:', error.message);
+        // Retornamos false para que el controlador responda 500 al cliente
         return false;
     }
 }

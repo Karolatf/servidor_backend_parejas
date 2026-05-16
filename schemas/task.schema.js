@@ -99,7 +99,8 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = createTaskSchema.partial();
 
 // Esquema para CAMBIAR solo el estado — PATCH /api/tasks/:id/status
-// Solo acepta el campo status con los cinco valores válidos del sistema
+// Acepta status (obligatorio) y comment (opcional) para que el estudiante
+// pueda actualizar su progreso y agregar un comentario en una sola petición.
 // ACTUALIZACIÓN: se agrega "reprobada" al enum
 export const updateTaskStatusSchema = z.object({
     status: z.enum(
@@ -109,6 +110,11 @@ export const updateTaskStatusSchema = z.object({
             message:        "El estado debe ser: 'pendiente', 'en_progreso', 'pendiente_aprobacion', 'completada' o 'reprobada'",
         }
     ),
+    // comment: opcional — el estudiante puede adjuntar una nota al cambiar el estado
+    comment: z
+        .string({ invalid_type_error: 'El comentario debe ser una cadena de texto' })
+        .max(500, 'El comentario no puede exceder los 500 caracteres')
+        .optional(),
 });
 
 // Esquema para ASIGNAR usuarios a una tarea — POST /api/tasks/:taskId/assign

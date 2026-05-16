@@ -11,47 +11,44 @@
 //
 // Este middleware se registra en app.js DESPUÉS de todas las rutas.
 
-// Captura el error, lo registra en consola y responde con el formato
-// estándar del proyecto.
-// Parámetros:
-//   error — objeto Error lanzado por el controlador
-//   req   — objeto de petición de Express (no se usa aquí)
-//   res   — objeto de respuesta para enviar el JSON de error
-//   next  — función next de Express (requerida para que Express
-//           reconozca este middleware como manejador de errores)
+// Exportamos errorMiddleware que recibe el error lanzado en cualquier controlador,
+// lo registra en consola y le responde al cliente con el formato estándar del proyecto
 export function errorMiddleware(error, req, res, next) {
 
-    // Registrar el error en consola para trazabilidad en el servidor
-    // Se registra también el code si existe (ej: ACCOUNT_DISABLED) para facilitar el debug
+    // Registramos el error en la consola del servidor para trazabilidad y debugging
+    // Si el error tiene un code especial (ej: ACCOUNT_DISABLED) también lo mostramos
     console.error(
         'Error capturado por el middleware global:',
         error.message,
+        // Mostramos el code solo si existe — el operador ? verifica antes de usarlo
         error.code ? `[code: ${error.code}]` : ''
     );
 
     // ── CASO ESPECIAL: cuenta de usuario desactivada ──────────────────────────
     // Este error lo lanza loginService cuando is_active = 0 en la BD.
     // Tiene error.code = 'ACCOUNT_DISABLED' y error.status = 403.
-    // Lo manejamos explícitamente aquí para garantizar el status 403
-    // y un mensaje claro que el frontend pueda mostrar al usuario.
+    // Lo manejamos explícitamente para garantizar el código 403
+    // y un mensaje claro que el frontend pueda mostrar al usuario desactivado
     if (error.code === 'ACCOUNT_DISABLED') {
         return res.status(403).json({
             success: false,
-            // El mensaje ya viene en español desde auth.service.js
+            // El mensaje ya viene en español desde auth.service.js — lo usamos directamente
             message: error.message,
             data:    null,
         });
     }
 
     // ── CASO GENERAL: cualquier otro error del sistema ────────────────────────
-    // error.status es la propiedad estándar del proyecto (ver auth.service.js)
-    // Si no viene status se usa 500 (error interno del servidor) por defecto
+    // error.status es la propiedad que los controladores y servicios establecen
+    // Si no viene ningún status usamos 500 (Error Interno del Servidor) por defecto
     const status  = error.status  || 500;
+    // Si el error no tiene mensaje propio, usamos un mensaje genérico en español
     const message = error.message || 'Error interno del servidor';
 
+    // Respondemos al cliente con el código HTTP apropiado y el formato estándar
     res.status(status).json({
-        success: false,
-        message,
-        data: null,
+        success: false,   // indica que la operación falló
+        message,          // mensaje descriptivo del error en español
+        data: null,       // null porque no hay datos que retornar en una respuesta de error
     });
 }

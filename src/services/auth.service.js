@@ -5,113 +5,107 @@
 // NUNCA conoce req, res ni Express.
 // Solo importa del modelo y de las librerías de seguridad.
 
+// Importamos jwt para firmar y verificar los tokens de sesión (JSON Web Tokens)
 import jwt    from 'jsonwebtoken';
+// Importamos bcrypt para hashear contraseñas y compararlas de forma segura
 import bcrypt from 'bcryptjs';
+// Importamos las funciones del modelo de usuarios que necesitamos para el login y registro
 import {
     getUserByEmail,
     getUserById,
     getUserByDocumento,
     createUserWithPassword,
-    getUserRolesAndPermissions,   // ← NUEVA importación para el RBAC
+    getUserRolesAndPermissions,   // traer los roles y permisos del sistema RBAC del usuario
 } from '../models/user.model.js';
 
-// Rondas de hashing para bcrypt.
-// 10 es el estándar recomendado por OWASP: buen balance entre seguridad y velocidad.
+// Definimos las rondas de hashing para bcrypt — 10 es el estándar OWASP recomendado
+// Más rondas = más seguro pero más lento; 10 es un buen balance para proyectos como este
 const SALT_ROUNDS = 10;
 
-// ── HASHEAR CONTRASEÑA ────────────────────────────────────────────────────────
-// Convierte una contraseña en texto plano a un hash irreversible.
-// Se usa en el script de semilla y en futuros endpoints de registro.
+// ── hashearPassword ───────────────────────────────────────────────────────────
+// Exportamos la función hashearPassword que recibe una contraseña en texto plano
+// y retorna el hash generado por bcrypt para guardar de forma segura en la BD
 export async function hashearPassword(passwordPlano) {
+    // Llamamos a bcrypt.hash que aplica el algoritmo de hashing con las 10 rondas configuradas
+    // El resultado es un string de ~60 caracteres que incluye el salt embebido automáticamente
     return bcrypt.hash(passwordPlano, SALT_ROUNDS);
 }
 
-// ── GENERAR ACCESS TOKEN ──────────────────────────────────────────────────────
-// Genera el token de corta duración (1h).
-// El payload incluye id, documento y role para que el middleware
-// pueda autorizar sin consultar la BD en cada petición.
+// ── generarAccessToken ────────────────────────────────────────────────────────
+// Exportamos la función generarAccessToken que recibe el objeto usuario
+// y retorna el token de corta duración (1h) firmado con JWT_SECRET
+// El payload incluye id, documento y role para que el middleware autorice sin consultar la BD
 export function generarAccessToken(usuario) {
     return jwt.sign(
+        // payload: datos que viajan dentro del token — no incluimos información sensible como password
         { id: usuario.id, documento: usuario.documento, role: usuario.role },
+        // secret: clave del .env con la que se firma el token — solo el servidor la conoce
         process.env.JWT_SECRET,
+        // options: el token vence en 1 hora — el cliente debe renovarlo con el refreshToken
         { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
     );
 }
 
-// ── GENERAR REFRESH TOKEN ─────────────────────────────────────────────────────
-// Genera el token de larga duración (7d).
-// Solo incluye el id para minimizar la información expuesta en el token.
-// Paulo lo usa en su endpoint POST /api/auth/refresh.
+// ── generarRefreshToken ───────────────────────────────────────────────────────
+// Exportamos la función generarRefreshToken que recibe el objeto usuario
+// y retorna el token de larga duración (7d) firmado con JWT_REFRESH_SECRET
+// Solo incluye el id para minimizar la información expuesta en el token de larga vida
 export function generarRefreshToken(usuario) {
     return jwt.sign(
+        // payload mínimo: solo el id — suficiente para identificar al usuario al renovar el accessToken
         { id: usuario.id },
+        // secret diferente al del accessToken — firmados de forma independiente por seguridad
         process.env.JWT_REFRESH_SECRET,
+        // options: el token vence en 7 días — el usuario re-logea solo una vez por semana
         { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
     );
 }
 
-// ── LOGIN (VERSIÓN ACTUALIZADA) ──────────────────────────────────────────────
-// POST /api/auth/login
-// Cuerpo: { email, password }
-// Retorna los tokens y datos del usuario, o null si las credenciales son incorrectas.
-//
-// CAMBIO: antes buscaba por documento, ahora busca por email.
-// Esto es coherente con el formulario del frontend que pide email + contraseña.
-// El payload del JWT sigue siendo { id, documento, role } para que el frontend
-// pueda identificar al usuario sin cambiar la lógica de fetchConAuth.js.
-//
-// El orden de las propiedades en el objeto de retorno también se ajusta:
-// primero accessToken, luego refreshToken, luego user, como pide el cliente.
-
+// ── loginService ──────────────────────────────────────────────────────────────
+// Exportamos la función loginService que recibe el email y la contraseña del formulario de login
+// y verifica las credenciales del usuario contra la base de datos
+// Retorna los tokens y datos del usuario si todo es correcto, o null si las credenciales son incorrectas
 export async function loginService({ email, password }) {
 
-    // 1. Buscar el usuario por email — CORRECTO
-    // INCORRECTO sería: getUserByDocumento(documento)
-    const usuario = await getUserByEmail(email); // ← esta línea debe decir email, no documento
+    // Buscamos el usuario en la BD por su email — retorna el objeto completo o undefined si no existe
+    const usuario = await getUserByEmail(email);
 
     // Si el usuario no existe en la BD retornamos null — el controlador responde 401
     if (!usuario) return null;
+    // Si el usuario no tiene contraseña hasheada (fue creado por admin sin password) retornamos null
     if (!usuario.password) return null;
 
-    // Verificar que el usuario esté activo antes de permitir el login
-    // is_active = 0 significa que el admin desactivó esta cuenta
-    // Lanzamos un Error con mensaje específico para diferenciarlo de "credenciales incorrectas"
-    // El controlador de auth capturará este Error y responderá con 403
+    // Verificamos que la cuenta esté activa antes de permitir el inicio de sesión
+    // is_active = 0 significa que el admin desactivó esta cuenta manualmente
     if (usuario.is_active === 0 || usuario.is_active === false) {
-        // Construir el error de cuenta desactivada con las propiedades que
-        // errorMiddleware necesita leer correctamente.
-        // IMPORTANTE: usar 'status' (no 'statusCode') porque errorMiddleware
-        // lee error.status — si usamos statusCode el middleware devuelve 500
+        // Creamos un Error con propiedades específicas que errorMiddleware sabe leer
         const errorDesactivado = new Error(
             'Tu cuenta ha sido desactivada. Comunícate con el administrador del sistema.'
         );
-        // code identifica este error específicamente en errorMiddleware
-        // para diferenciarlo de otros errores y responder con 403 (no 401 ni 500)
+        // code identifica este error específicamente para que errorMiddleware lo trate aparte
         errorDesactivado.code   = 'ACCOUNT_DISABLED';
-        // status (sin "Code") es la propiedad que errorMiddleware lee en línea:
-        // const status = error.status || 500
+        // status (sin "Code") es la propiedad que errorMiddleware lee para el código HTTP
         errorDesactivado.status = 403;
+        // Lanzamos el error para que catchAsync lo capture y lo pase al middleware global
         throw errorDesactivado;
     }
 
-    // 2. Comparar contraseña con bcrypt
+    // Comparamos la contraseña que llegó del formulario con el hash guardado en la BD
+    // bcrypt.compare retorna true si coinciden, false si la contraseña es incorrecta
     const passwordCorrecta = await bcrypt.compare(password, usuario.password);
+    // Si la contraseña no coincide, retornamos null — el controlador responde 401
     if (!passwordCorrecta) return null;
 
-    // 3. Generar tokens
+    // Generamos el accessToken de 1h con los datos actuales del usuario
     const accessToken  = generarAccessToken(usuario);
+    // Generamos el refreshToken de 7d que el cliente usará para renovar el accessToken
     const refreshToken = generarRefreshToken(usuario);
- 
-    // 4. Obtener los roles y permisos del usuario desde las tablas RBAC.
-    //    Se consulta la BD en lugar de incluirlos en el JWT para:
-    //    a) Mantener el token ligero (solo id, documento, role)
-    //    b) Reflejar cambios de roles en tiempo real sin necesidad de re-login
-    //    Si el usuario no tiene roles en user_roles (instalación legacy),
-    //    retorna un arreglo vacío y el sistema funciona con el campo `role` del JWT.
+
+    // Consultamos los roles y permisos del sistema RBAC para incluirlos en la respuesta
+    // Los consultamos desde la BD (no del JWT) para reflejar cambios en tiempo real sin re-login
     const roles = await getUserRolesAndPermissions(usuario.id);
- 
-    // 5. Retornar sin password — incluye los roles para que el frontend
-    //    pueda adaptar la UI según los permisos del usuario.
+
+    // Retornamos los tokens y los datos del usuario — sin el campo password por seguridad
     return {
         accessToken,
         refreshToken,
@@ -122,81 +116,65 @@ export async function loginService({ email, password }) {
             documento: usuario.documento,
             email:     usuario.email,
         },
-        // roles es el arreglo de objetos { name, permissions: [] }
-        // El frontend puede usarlo para mostrar/ocultar elementos según permisos
+        // roles: arreglo de objetos { name, permissions: [] } para que el frontend adapte la UI
         roles,
     };
 }
 
-// ── RENOVAR ACCESS TOKEN ──────────────────────────────────────────────────────
-// Valida el refreshToken y emite un nuevo accessToken.
-// Lo usa el endpoint de Paulo (POST /api/auth/refresh).
+// ── renovarAccessTokenService ─────────────────────────────────────────────────
+// Exportamos la función renovarAccessTokenService que recibe el refreshToken del cliente
+// y genera un nuevo accessToken de 1h si el refreshToken es válido y el usuario sigue existiendo
 export async function renovarAccessTokenService(refreshToken) {
-    // Lanza error si la firma es inválida o el token expiró
+    // Verificamos la firma del refreshToken con JWT_REFRESH_SECRET — lanza error si es inválido o expiró
+    // payload contiene los datos del token: { id, iat, exp }
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-    // Verificar que el usuario sigue existiendo en la BD
+    // Verificamos que el usuario del token siga existiendo en la BD — pudo haber sido eliminado
     const usuario = await getUserById(payload.id);
+    // Si el usuario ya no existe en la BD, retornamos null — el cliente debe hacer login completo
     if (!usuario) return null;
 
-    // Emitir un nuevo accessToken con los datos actuales del usuario
+    // Generamos y retornamos el nuevo accessToken con los datos actuales del usuario desde la BD
     return generarAccessToken(usuario);
 }
 
-// ── REGISTRO DE USUARIO ──────────────────────────────────────────────────────
-// POST /api/auth/register
-// Cuerpo: { name, documento, email, password }
-//
-// Este servicio es nuevo: no existía antes porque el sistema dependía del
-// script manual scripts/changePassword.js para crear usuarios con contraseña.
-// Ahora el usuario puede registrarse directamente desde la pantalla de inicio.
-//
-// El registro:
-//   1. Verifica que el email no esté en uso (409 si ya existe)
-//   2. Verifica que el documento no esté en uso (409 si ya existe)
-//   3. Hashea la contraseña con bcrypt antes de guardarla en MySQL
-//   4. Crea el usuario con role = 'user' por defecto
-//   5. Retorna el usuario creado sin el campo password
-//
-// Retorna un objeto { error, usuario } en lugar de solo el usuario para que
-// el controlador pueda distinguir entre un éxito y un error 409 sin usar try/catch.
+// ── registerService ───────────────────────────────────────────────────────────
+// Exportamos la función registerService que recibe los datos del formulario de registro
+// y crea el usuario nuevo en la BD después de verificar duplicados y hashear la contraseña
+// Retorna { error, codigo } si hay un conflicto, o { usuario } si el registro fue exitoso
 export async function registerService({ name, documento, email, password }) {
 
-    // 1. Verificar que el email no esté registrado ya
-    // getUserByEmail viene del modelo de usuarios y busca en la tabla users de MySQL
+    // Verificamos que el email no esté ya registrado en la BD
     const usuarioPorEmail = await getUserByEmail(email);
     if (usuarioPorEmail) {
-        // Se retorna un objeto de error en lugar de lanzar excepción
-        // para que el controlador pueda responder con 409 de forma limpia
+        // Retornamos un objeto de error en lugar de lanzar excepción — el controlador responde 409
         return { error: 'El correo electrónico ya está registrado en el sistema', codigo: 409 };
     }
 
-    // 2. Verificar que el documento no esté registrado ya
-    // getUserByDocumento viene del modelo y busca en la columna 'documento' de la tabla users
+    // Verificamos que el número de documento no esté ya registrado en la BD
     const usuarioPorDocumento = await getUserByDocumento(documento);
     if (usuarioPorDocumento) {
+        // Mismo patrón — retornamos objeto de error con código 409 (Conflicto)
         return { error: 'El número de documento ya está registrado en el sistema', codigo: 409 };
     }
 
-    // 3. Hashear la contraseña antes de guardarla en la base de datos
-    // NUNCA se guarda una contraseña en texto plano en la BD
-    // SALT_ROUNDS = 10 es el estándar recomendado por OWASP (ya está definido arriba en el archivo)
+    // Hasheamos la contraseña con bcrypt antes de guardarla — NUNCA texto plano en la BD
+    // hashearPassword usa SALT_ROUNDS = 10 definido al inicio de este archivo
     const passwordHasheada = await hashearPassword(password);
 
-    // 4. Crear el usuario en MySQL con la contraseña ya hasheada
-    // createUserWithPassword es una función nueva que se agrega al modelo
-    // (ver src/models/user.model.js más abajo)
-    // El rol es 'user' por defecto — solo un admin puede cambiar el rol después
+    // Creamos el usuario en MySQL con la contraseña ya hasheada y el rol 'user' por defecto
+    // Solo un admin puede cambiar el rol después del registro
     const usuarioCreado = await createUserWithPassword({
         name,
         documento,
         email,
-        password: passwordHasheada,
+        password: passwordHasheada,   // guardamos el hash, nunca el texto plano
         role: 'user',
     });
 
-    // 5. Retornar el usuario sin el campo password
-    // Se usa desestructuración para excluir password del objeto de retorno
+    // Excluimos el campo password del objeto antes de retornarlo al controlador
+    // La desestructuración con alias (_ignorado) descarta password del objeto de retorno
     const { password: _ignorado, ...usuarioSinPassword } = usuarioCreado;
+    // Retornamos el objeto de éxito con el usuario ya sin el campo password
     return { usuario: usuarioSinPassword };
 }
