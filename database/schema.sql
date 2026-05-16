@@ -1,32 +1,12 @@
 -- ============================================================
 -- ARCHIVO: database/schema.sql
--- PROYECTO: servidor_backend_parejas - Sistema de Gestión de Tareas
--- AUTORES: Karol Torres y Sebastian Patiño
--- SENA: Técnico en Programación de Software
--- ============================================================
--- INSTRUCCIONES:
--- 1. Ejecutar primero el bloque de root (solo una vez, si no se ha hecho):
---
---    CREATE DATABASE IF NOT EXISTS gestion_tareas_sena;
---    CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TORRES_2007';
---    GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
---    FLUSH PRIVILEGES;
---
--- 2. Ejecutar este archivo completo con la conexión app_user en Workbench.
+-- Paso 2 — Ejecutar en Workbench con conexión app_user
+-- Crea las tablas principales del sistema
 -- ============================================================
 
 USE gestion_tareas_sena;
 
--- ============================================================
--- TABLA: users
---
--- documento:           número de documento único por persona
--- password:            hash bcrypt (nunca texto plano)
--- role:                'admin' | 'instructor' | 'user'
--- is_active:           1 = activo, 0 = desactivado (soft delete)
--- deactivation_reason: motivo registrado al desactivar (issue P1)
--- deactivation_date:   fecha en que se desactivÃ³ (issue P1)
--- ============================================================
+-- ── TABLA: users ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
     id                   INT          NOT NULL AUTO_INCREMENT,
     documento            VARCHAR(20)  NOT NULL UNIQUE,
@@ -34,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     email                VARCHAR(100) NOT NULL,
     password             VARCHAR(255) NULL,
     role                 VARCHAR(20)  NOT NULL DEFAULT 'user',
-    is_active            TINYINT(1)   NOT NULL DEFAULT 1,
+    is_active            TINYINT(1)   NOT NULL DEFAULT 1,  -- 1=activo, 0=desactivado
     deactivation_reason  TEXT         NULL     DEFAULT NULL,
     deactivation_date    TIMESTAMP    NULL     DEFAULT NULL,
     created_ud           TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -43,19 +23,11 @@ CREATE TABLE IF NOT EXISTS users (
     PRIMARY KEY (id)
 );
 
--- ============================================================
--- TABLA: tasks
---
--- assigned_users:      arreglo JSON de IDs de usuarios asignados [1, 3, 5]
--- comment:             comentario libre del usuario sobre la tarea
--- grade:               nota numérica 0-100 asignada por el instructor (NULL = sin calificar)
--- grade_reason:        motivo de la última edición de nota (obligatorio al editar nota)
--- deleted_user_names:  mapa JSON { "userId": "nombre" } que preserva el nombre
---                      de usuarios eliminados permanentemente antes de borrarlos,
---                      para que las tareas sigan mostrando a quien estaban asignadas
--- status valores válidos:
---   pendiente | en_progreso | pendiente_aprobacion | completada | reprobada
--- ============================================================
+-- ── TABLA: tasks ─────────────────────────────────────────────
+-- assigned_users: arreglo JSON de IDs  [1, 3, 5]
+-- deleted_user_names: mapa JSON { "id": "nombre" } — preserva nombre de usuarios eliminados
+-- status: pendiente | en_progreso | pendiente_aprobacion | completada | reprobada
+-- grade: nota 0-100 asignada por el instructor (NULL = sin calificar)
 CREATE TABLE IF NOT EXISTS tasks (
     id                  INT          NOT NULL AUTO_INCREMENT,
     title               VARCHAR(200) NOT NULL,
@@ -72,30 +44,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     PRIMARY KEY (id)
 );
 
--- ============================================================
--- TABLA: calendar_events
---
--- Eventos del calendario creados por el instructor o el usuario.
--- Dos tipos de evento:
---   'propio'      recordatorio personal (sin estudiante asignado)
---   'estudiante'  asignado a un estudiante; aparece en su calendario
---                  en modo solo lectura (sin botÃ³n eliminar)
---
--- instructor_id: FK al usuario que crea el evento
---                (puede ser el instructor o el propio usuario para eventos propios)
--- student_id:    FK al estudiante asignado (NULL si es evento propio)
--- task_id:       FK a la tarea relacionada (NULL si no aplica)
--- date:          fecha del evento (YYYY-MM-DD)
--- color:         hex del color visible en el calendario
---   índigo  #6366f1 evento propio del instructor o del usuario
---   celeste #0ea5e9 evento asignado a un estudiante
--- tipo:          'propio' | 'estudiante'
---
--- Reglas de eliminaciÃ³n:
---   Si se elimina el instructor - sus eventos se eliminan en cascada
---   Si se elimina el estudiante - el evento queda sin asignar (NULL)
---   Si se elimina la tarea      - el evento queda sin tarea (NULL)
--- ============================================================
+-- ── TABLA: calendar_events ───────────────────────────────────
+-- tipo: 'propio' (recordatorio personal) | 'estudiante' (visible al aprendiz)
+-- Si se elimina el instructor → sus eventos se eliminan en cascada
+-- Si se elimina el estudiante o la tarea → FK queda en NULL
 CREATE TABLE IF NOT EXISTS calendar_events (
     id             INT          NOT NULL AUTO_INCREMENT,
     instructor_id  INT          NOT NULL,
@@ -110,11 +62,8 @@ CREATE TABLE IF NOT EXISTS calendar_events (
 
     PRIMARY KEY (id),
 
-    -- Buscar eventos por instructor + fecha (consulta más frecuente del panel instructor)
     INDEX idx_calendar_instructor_date (instructor_id, date),
-
-    -- Buscar eventos por estudiante + fecha (consulta del panel usuario)
-    INDEX idx_calendar_student_date (student_id, date),
+    INDEX idx_calendar_student_date    (student_id, date),
 
     CONSTRAINT fk_calendar_instructor
         FOREIGN KEY (instructor_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -126,19 +75,8 @@ CREATE TABLE IF NOT EXISTS calendar_events (
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 );
 
--- ============================================================
--- TABLA: user_notes
---
--- Notas personales del usuario (migradas de localStorage al servidor).
--- Cada nota pertenece a un único usuario y tiene texto libre y color pastel.
--- Al eliminar el usuario, sus notas se eliminan automáticamente (CASCADE).
---
--- color valores tí­picos usados por el frontend:
---   #fef3c7 amarillo pastel
---   #fce7f3 rosa pastel
---   #d1fae5 verde pastel
---   #dbeafe celeste pastel
--- ============================================================
+-- ── TABLA: user_notes ────────────────────────────────────────
+-- Notas personales del aprendiz — al eliminar el usuario sus notas se borran en cascada
 CREATE TABLE IF NOT EXISTS user_notes (
     id         INT         NOT NULL AUTO_INCREMENT,
     user_id    INT         NOT NULL,
@@ -148,9 +86,34 @@ CREATE TABLE IF NOT EXISTS user_notes (
 
     PRIMARY KEY (id),
 
-    -- Acelera la consulta GET /api/notes (siempre filtrada por user_id)
     INDEX idx_user_notes_user (user_id),
 
     CONSTRAINT fk_user_notes_user
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- ============================================================
+-- COMANDOS SQL USADOS EN ESTE ARCHIVO
+-- ============================================================
+-- USE bd                           → selecciona la base de datos activa
+-- CREATE TABLE IF NOT EXISTS       → crea la tabla solo si no existe
+-- INT                              → número entero (IDs, flags)
+-- VARCHAR(n)                       → texto de longitud máxima n (nombres, roles, colores)
+-- TEXT                             → texto largo sin límite fijo (descripciones, contraseñas hash)
+-- DECIMAL(5,2)                     → número con decimales — aquí para la nota (0.00 a 999.99)
+-- TINYINT(1)                       → entero pequeño usado como booleano (0/1)
+-- TIMESTAMP                        → fecha + hora; se usa para created_at / updated_at
+-- DATE                             → solo fecha sin hora (eventos del calendario)
+-- JSON                             → columna JSON nativa de MySQL (arreglos e objetos)
+-- NOT NULL                         → el campo es obligatorio
+-- NULL                             → el campo es opcional
+-- DEFAULT valor                    → valor que toma la columna si no se especifica
+-- DEFAULT CURRENT_TIMESTAMP        → fecha/hora del servidor al insertar
+-- ON UPDATE CURRENT_TIMESTAMP      → se actualiza automáticamente al modificar la fila
+-- UNIQUE                           → no permite valores duplicados en esa columna
+-- AUTO_INCREMENT                   → el ID se incrementa solo con cada nuevo registro
+-- PRIMARY KEY (col)                → identificador único de cada fila
+-- INDEX nombre (col1, col2)        → índice que acelera búsquedas por esas columnas
+-- FOREIGN KEY (col) REFERENCES     → vincula esta columna a la PK de otra tabla
+-- ON DELETE CASCADE                → al borrar el padre, los hijos se borran también
+-- ON DELETE SET NULL               → al borrar el padre, la FK queda en NULL

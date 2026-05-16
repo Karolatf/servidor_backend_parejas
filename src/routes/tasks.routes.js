@@ -37,52 +37,54 @@ import {
     assignUsersSchema,
 } from '../../schemas/task.schema.js';
 
+import { requireAdminOrInstructor } from '../middlewares/auth.middleware.js';
+
 const router = Router();
 
 // ── RUTAS SIN PARÁMETRO DINÁMICO ──
 // Deben ir PRIMERO para que Express no las confunda con /:id
 
-// GET /api/tasks/filter — filtra por ?status y/o ?userId
+// GET /api/tasks/filter — filtra por ?status y/o ?userId (accesible por todos los roles)
 router.get('/filter', filterTasks);
 
-// GET /api/tasks/dashboard — estadísticas generales
-router.get('/dashboard', getDashboard);
+// GET /api/tasks/dashboard — estadísticas generales (solo admin e instructor)
+router.get('/dashboard', requireAdminOrInstructor, getDashboard);
 
 // ── RUTAS PRINCIPALES ──
 
-// GET  /api/tasks — lista todas las tareas (no requiere validación de body)
+// GET  /api/tasks — lista todas las tareas (accesible por todos los roles autenticados)
 router.get('/', getTasks);
 
-// POST /api/tasks — crea una tarea nueva
+// POST /api/tasks — crea una tarea nueva (solo admin e instructor)
 // validateSchema(createTaskSchema) actúa como guardia antes de createTask
-router.post('/', validateSchema(createTaskSchema), createTask);
+router.post('/', requireAdminOrInstructor, validateSchema(createTaskSchema), createTask);
 
-// GET    /api/tasks/:id — obtiene una tarea por id (no requiere validación de body)
+// GET    /api/tasks/:id — obtiene una tarea por id (accesible por todos los roles)
 router.get('/:id', getTaskById);
 
-// PUT    /api/tasks/:id — actualiza una tarea completa
+// PUT    /api/tasks/:id — actualiza una tarea completa (solo admin e instructor)
 // updateTaskSchema usa .partial() así que todos los campos son opcionales
-router.put('/:id', validateSchema(updateTaskSchema), updateTask);
+router.put('/:id', requireAdminOrInstructor, validateSchema(updateTaskSchema), updateTask);
 
-// DELETE /api/tasks/:id — elimina una tarea (no requiere validación de body)
-router.delete('/:id', deleteTask);
+// DELETE /api/tasks/:id — elimina una tarea (solo admin e instructor)
+router.delete('/:id', requireAdminOrInstructor, deleteTask);
 
 // ── ESTADO ──
 
-// PATCH /api/tasks/:id/status — cambia solo el estado
-// Solo valida que status tenga uno de los tres valores permitidos
+// PATCH /api/tasks/:id/status — cambia solo el estado (accesible por todos los roles)
+// Los estudiantes usan este endpoint para actualizar el progreso de sus tareas
 router.patch('/:id/status', validateSchema(updateTaskStatusSchema), updateTaskStatus);
 
 // ── ASIGNACIÓN DE USUARIOS ──
 
-// POST   /api/tasks/:taskId/assign — asigna usuarios a una tarea
+// POST   /api/tasks/:taskId/assign — asigna usuarios a una tarea (solo admin e instructor)
 // Valida que userIds sea un arreglo con al menos un número
-router.post('/:taskId/assign', validateSchema(assignUsersSchema), assignUsersToTask);
+router.post('/:taskId/assign', requireAdminOrInstructor, validateSchema(assignUsersSchema), assignUsersToTask);
 
-// GET    /api/tasks/:taskId/users — lista usuarios asignados (no requiere validación)
+// GET    /api/tasks/:taskId/users — lista usuarios asignados (accesible por todos los roles)
 router.get('/:taskId/users', getAssignedUsers);
 
-// DELETE /api/tasks/:taskId/users/:userId — quita un usuario (no requiere validación de body)
-router.delete('/:taskId/users/:userId', removeUserFromTask);
+// DELETE /api/tasks/:taskId/users/:userId — quita un usuario (solo admin e instructor)
+router.delete('/:taskId/users/:userId', requireAdminOrInstructor, removeUserFromTask);
 
 export default router;
