@@ -113,25 +113,26 @@ export const deleteTask = catchAsync(async (req, res) => {
 });
 
 // ── PATCH /api/tasks/:id/status ───────────────────────────────────────────────
-// Cambia solo el campo status de una tarea (el usuario actualiza el progreso de su tarea)
-// Cuerpo esperado: { status: 'pendiente' | 'en_progreso' | 'pendiente_aprobacion' }
-// La validación del enum la hace validateSchema(updateTaskStatusSchema)
+// Cambia el estado de una tarea y opcionalmente guarda un comentario del estudiante.
+// Accesible por todos los roles — el estudiante lo usa para actualizar su progreso.
+// Cuerpo esperado: { status: '...', comment?: '...' }
+// La validación la hace validateSchema(updateTaskStatusSchema)
 export const updateTaskStatus = catchAsync(async (req, res) => {
     // Sacamos el id de la tarea del parámetro de la URL
-    const { id }     = req.params;
-    // Sacamos el nuevo estado que el usuario quiere aplicar
-    const { status } = req.body;
+    const { id }               = req.params;
+    // Sacamos el nuevo estado y el comentario opcional del cuerpo
+    const { status, comment }  = req.body;
 
-    // Llamamos a changeStatus que internamente llama a updateTask con solo el campo status
+    // Llamamos a changeStatus pasando también comment para que lo persista en la BD
     // Retorna la tarea con el estado ya actualizado, o null si el id no existe
-    const tareaActualizada = await changeStatus(id, status);
+    const tareaActualizada = await changeStatus(id, status, comment);
 
     // Si changeStatus retornó null significa que no existe ninguna tarea con ese id
     if (!tareaActualizada) {
         return errorResponse(res, `Tarea con id ${id} no encontrada`, 404);
     }
 
-    // Llegamos aquí porque el estado cambió correctamente — enviamos la tarea actualizada
+    // Llegamos aquí porque el estado (y opcionalmente el comentario) cambió correctamente
     return successResponse(res, 'Estado actualizado correctamente', tareaActualizada);
 });
 

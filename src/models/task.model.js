@@ -329,12 +329,15 @@ export async function getTasksByUserId(userId) {
     return todas.filter(t => t.assignedUsers.includes(Number(userId)));
 }
 
-// updateTaskStatus — cambia solo el campo status de una tarea
-// Se usa en PATCH /api/tasks/:id/status (el usuario cambia el estado de su propia tarea)
-// Llama a updateTask internamente para reutilizar la lógica de validación y retorno
-export async function updateTaskStatus(id, status) {
-    // Se pasa un objeto con solo el campo status para que updateTask actualice únicamente ese campo
-    return updateTask(id, { status });
+// updateTaskStatus — cambia el estado de una tarea y opcionalmente guarda un comentario
+// Se usa en PATCH /api/tasks/:id/status — accesible por todos los roles autenticados
+// Llama a updateTask internamente para reutilizar la lógica de persistencia
+export async function updateTaskStatus(id, status, comment) {
+    // Construimos el objeto de actualización con status siempre presente
+    const campos = { status };
+    // Solo incluimos comment si el controlador lo recibió — undefined lo excluye del UPDATE
+    if (comment !== undefined) campos.comment = comment;
+    return updateTask(id, campos);
 }
 
 // assignUsersToTask — agrega usuarios al arreglo assignedUsers de una tarea
