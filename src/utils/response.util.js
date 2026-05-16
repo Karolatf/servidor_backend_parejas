@@ -1,40 +1,34 @@
 // MÓDULO: utils/response.util.js
 // CAPA: Utils
-
+//
 // Centraliza la estructura de todas las respuestas HTTP de la API.
 // Garantiza que el frontend siempre reciba el mismo contrato JSON
 // sin importar qué endpoint respondió.
-
+//
 // Formato estándar acordado:
 //   { success: boolean, message: string, data: any }
-
+//
 // Ningún controlador debe usar res.status().json() directamente.
 // Siempre deben pasar por successResponse o errorResponse.
 
-// Genera una respuesta exitosa con el formato estándar del proyecto.
-// Parámetros:
-//   res     — objeto de respuesta de Express
-//   message — mensaje descriptivo del resultado para el frontend
-//   data    — datos a retornar (arreglo, objeto o null si no hay datos)
-//   status  — código HTTP (default 200, usar 201 para creaciones)
+// Exportamos successResponse que recibe el objeto de respuesta de Express,
+// un mensaje descriptivo, los datos a enviar y el código HTTP
+// y construye la respuesta exitosa con el formato estándar del proyecto
 export function successResponse(res, message, data = null, status = 200) {
     return res.status(status).json({
-        success: true,
-        message,
-        data,
+        success: true,    // indica que la operación fue exitosa — el frontend lo lee para confirmar
+        message,          // mensaje en español que el frontend puede mostrar al usuario
+        data,             // los datos de la respuesta: objeto, arreglo o null si no hay datos
     });
 }
 
-// Genera una respuesta de error con el formato estándar del proyecto.
-// Parámetros:
-//   res     — objeto de respuesta de Express
-//   message — mensaje descriptivo del error para el frontend
-//   status  — código HTTP (400 cliente, 404 no encontrado, 500 servidor)
-//   data    — información adicional del error (opcional, casi siempre null)
+// Exportamos errorResponse que recibe el objeto de respuesta de Express,
+// un mensaje de error, el código HTTP apropiado y datos opcionales del error
+// y construye la respuesta de error con el formato estándar del proyecto
 export function errorResponse(res, message, status = 500, data = null) {
     return res.status(status).json({
-        success: false,
-        message,
-        data,
+        success: false,   // indica que la operación falló — el frontend lo lee para mostrar el error
+        message,          // mensaje en español que describe el error para el usuario
+        data,             // información adicional del error — casi siempre null en este proyecto
     });
 }

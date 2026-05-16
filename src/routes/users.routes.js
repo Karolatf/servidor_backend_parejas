@@ -4,19 +4,33 @@
 // Responsabilidad única: definir qué función del controlador
 // maneja cada combinación de método HTTP + ruta de usuarios.
 //
-// CORRECCIÓN APLICADA EN ESTA VERSIÓN:
-//   La ruta GET /:userId/tasks estaba DESPUÉS de GET /:id.
-//   Express evalúa las rutas en el orden en que están definidas,
-//   y /:id capturaba "tasks" como valor del parámetro id antes
-//   de que Express llegara a evaluar /:userId/tasks.
-//   Solución: mover /:userId/tasks ANTES de /:id.
+// REGLA CRÍTICA DE ORDEN:
+//   Express evalúa las rutas en el orden en que están definidas.
+//   /by-document/:documento y /:userId/tasks deben ir ANTES de /:id
+//   para que Express no interprete "by-document" ni "tasks" como un id numérico.
 //
-// ACTUALIZACIÓN — Validaciones con Zod:
-//   Se agregó validateSchema en las rutas POST y PUT para proteger
-//   la creación y actualización de usuarios con reglas de negocio.
+// MONTAJE EN app.js:
+//   app.use('/api/users', verifyToken, usersRouter)
+//   verifyToken ya está aplicado globalmente — req.usuario está disponible
+//   en todos los controladores sin necesidad de repetirlo en cada ruta.
 
+// Importamos Router de express para crear un enrutador modular
+// Router permite separar las rutas de usuarios del servidor principal en app.js
 import { Router } from 'express';
 
+// Importamos todos los controladores que manejan las operaciones sobre usuarios
+// getUsers           — lista todos los usuarios de la BD
+// getUserById        — obtiene un usuario específico por su id numérico
+// getUserByDocumento — busca un usuario por número de documento de identidad
+// createUser         — crea un usuario nuevo sin contraseña inicial
+// updateUser         — actualiza los datos de un usuario existente
+// deleteUser         — eliminación estándar con restricciones de tareas activas
+// forceDeleteUser    — eliminación forzosa sin restricciones de estado ni tareas
+// getUserTasks       — lista todas las tareas asignadas a un usuario
+// changeUserRole     — cambia el rol de un usuario (admin/instructor/user)
+// changeUserPassword — cambia la contraseña del usuario autenticado
+// deactivateUser     — desactiva un usuario (is_active = 0) sin eliminarlo
+// reactivateUser     — reactiva un usuario previamente desactivado
 import {
     getUsers,
     getUserById,
@@ -26,84 +40,98 @@ import {
     deleteUser,
     forceDeleteUser,
     getUserTasks,
-    changeUserRole,          // ← nueva función
+    changeUserRole,
     changeUserPassword,
-    // Importar el nuevo controlador de desactivación lógica
     deactivateUser,
     reactivateUser,
 } from '../controller/users.controller.js';
 
-// Se importa el middleware genérico de validación (creado por Sebastián)
+// Importamos validateSchema que es el middleware genérico de validación con Zod
+// Recibe un schema y retorna un middleware que valida req.body antes de llegar al controlador
 import { validateSchema } from '../middlewares/validator.middleware.js';
 
-// Se importan los esquemas de validación para las operaciones de usuarios
+// Importamos los tres schemas de validación para las operaciones de usuarios
+// createUserSchema — valida documento, name y email en POST /api/users
+// updateUserSchema — igual que createUserSchema pero todos los campos son opcionales
+// changeRoleSchema — valida que role sea 'admin', 'user' o 'instructor'
 import {
     createUserSchema,
     updateUserSchema,
+    changeRoleSchema,
 } from '../../schemas/user.schema.js';
 
-import { requireAdmin, requireAdminOrInstructor } from '../middlewares/auth.middleware.js';
-import { changeRoleSchema } from '../../schemas/user.schema.js';
+// Importamos los middlewares de autorización por rol
+// requireAdmin             — verifica que el usuario autenticado tenga rol 'admin'
+// requireAdminOrInstructor — verifica que el usuario tenga rol 'admin' o 'instructor'
+import { requireAdmin, requireAdminOrInstructor, verifyToken } from '../middlewares/auth.middleware.js';
 
-import { verifyToken } from '../middlewares/auth.middleware.js';
-
+// Creamos la instancia del enrutador — este objeto registra todas las rutas de usuarios
+// y se monta en app.js bajo el prefijo /api/users
 const router = Router();
 
-// ── RUTAS SIN PARÁMETRO DINÁMICO ─────────────────────────────────────────────
+// ── RUTAS SIN PARÁMETRO DINÁMICO (van PRIMERO) ─────────────────────────────
 
-// GET  /api/users — lista todos los usuarios (solo admin e instructor)
+// GET /api/users — lista todos los usuarios de la BD
+// requireAdminOrInstructor verifica que el usuario sea admin o instructor antes de listar
 router.get('/', requireAdminOrInstructor, getUsers);
 
-// POST /api/users — crea un usuario nuevo (solo admin)
-// validateSchema(createUserSchema) valida documento, name y email antes de crear
+// POST /api/users — crea un usuario nuevo sin contraseña inicial
+// requireAdmin verifica que solo el admin pueda crear usuarios desde el panel
+// validateSchema(createUserSchema) valida documento, name y email antes de llegar a createUser
 router.post('/', requireAdmin, validateSchema(createUserSchema), createUser);
 
-// ── RUTAS CON SEGMENTO FIJO AL FINAL (van ANTES de /:id) ─────────────────────
+// ── RUTAS CON SEGMENTO FIJO AL FINAL (van ANTES de /:id) ───────────────────
 
-// GET /api/users/by-document/:documento — busca un usuario por su número de documento.
-// CRÍTICO: va ANTES de /:id para que Express no interprete "by-document" como un id.
+// GET /api/users/by-document/:documento — busca un usuario por número de documento
+// Va ANTES de /:id para que Express no interprete "by-document" como un id numérico
+// requireAdminOrInstructor garantiza que solo admin e instructor puedan buscar por documento
 router.get('/by-document/:documento', requireAdminOrInstructor, getUserByDocumento);
 
-// GET /api/users/:userId/tasks — retorna todas las tareas asignadas a un usuario.
-// Solo admin e instructor pueden ver las tareas de otros usuarios.
-// CORRECCIÓN: esta ruta va ANTES de /:id para que Express no interprete
-// el segmento "tasks" como el valor del parámetro id.
+// GET /api/users/:userId/tasks — lista todas las tareas asignadas a un usuario específico
+// Va ANTES de /:id para que Express no interprete "tasks" como un id numérico
+// requireAdminOrInstructor garantiza que solo admin e instructor vean las tareas de otros usuarios
 router.get('/:userId/tasks', requireAdminOrInstructor, getUserTasks);
 
-// ── RUTAS CON PARÁMETRO DINÁMICO /:id (van DESPUÉS de las específicas) ────────
+// ── RUTAS CON PARÁMETRO DINÁMICO /:id (van DESPUÉS de las específicas) ──────
 
-// PATCH /api/users/:id/password — cambio de contraseña del usuario logueado
-// verifyToken verifica que la petición viene de un usuario autenticado
-// Solo el usuario dueño del token puede cambiar su propia contraseña
+// PATCH /api/users/:id/password — cambia la contraseña del usuario autenticado
+// verifyToken se aplica aquí explícitamente para garantizar autenticación en este endpoint
+// El controlador verifica que req.usuario.id coincida con req.params.id antes de cambiar
 router.patch('/:id/password', verifyToken, changeUserPassword);
 
-// GET    /api/users/:id — obtiene un usuario por su id numérico (solo admin e instructor)
+// GET /api/users/:id — obtiene un usuario específico por su id numérico
+// requireAdminOrInstructor garantiza que solo admin e instructor puedan ver usuarios individuales
 router.get('/:id', requireAdminOrInstructor, getUserById);
 
-// PUT    /api/users/:id — actualiza los datos de un usuario (solo admin)
-// updateUserSchema usa .partial() — los campos son opcionales pero si vienen, se validan
+// PUT /api/users/:id — actualiza los datos de un usuario existente
+// requireAdmin garantiza que solo el admin pueda modificar usuarios
+// updateUserSchema usa .partial() — el frontend puede enviar solo los campos que cambiaron
 router.put('/:id', requireAdmin, validateSchema(updateUserSchema), updateUser);
 
 // PATCH /api/users/:id/deactivate — desactiva un usuario (is_active = 0)
-// Solo el admin puede ejecutar esta acción — requireAdmin verifica el rol del token
+// Solo el admin puede desactivar usuarios — requireAdmin lo verifica
 // No elimina el usuario ni sus tareas — solo bloquea su acceso al sistema
-router.patch('/:id/deactivate',  requireAdmin, deactivateUser);
-// Reactivar usuario desactivado — solo admin, mismo patrón que deactivate
-router.patch('/:id/reactivate',  requireAdmin, reactivateUser);
+router.patch('/:id/deactivate', requireAdmin, deactivateUser);
 
-// DELETE /api/users/:id — eliminación estándar: borra de la BD si el usuario
-// no tiene tareas pendientes/en_progreso. Requiere body { reason } y rol admin.
+// PATCH /api/users/:id/reactivate — reactiva un usuario previamente desactivado
+// Operación inversa a deactivate — restaura is_active = 1 en la BD
+// Solo el admin puede reactivar usuarios — requireAdmin lo verifica
+router.patch('/:id/reactivate', requireAdmin, reactivateUser);
+
+// DELETE /api/users/:id — eliminación estándar: solo borra si el usuario no tiene tareas activas
+// requireAdmin garantiza que solo el admin pueda eliminar usuarios
+// El controlador verifica el estado de las tareas antes de proceder con el DELETE
 router.delete('/:id', requireAdmin, deleteUser);
 
 // DELETE /api/users/:id/force — eliminación forzosa sin restricciones de estado ni tareas
-// Requiere body { reason } con al menos 10 caracteres para auditoría
-// Solo accesible para administradores (requireAdmin)
+// requireAdmin garantiza que solo el admin pueda hacer eliminaciones forzosas
+// El controlador requiere body { reason } con al menos 10 caracteres para auditoría
 router.delete('/:id/force', requireAdmin, forceDeleteUser);
 
-// PATCH /api/users/:id/role — cambia el rol de un usuario
-// verifyToken ya se aplica en app.js para todas las rutas /api/users
-// requireAdmin verifica adicionalmente que el usuario autenticado sea admin
-// validateSchema(changeRoleSchema) valida que role sea 'admin' o 'user'
+// PATCH /api/users/:id/role — cambia el rol de un usuario existente
+// requireAdmin verifica que solo el admin pueda cambiar roles
+// validateSchema(changeRoleSchema) valida que role sea 'admin', 'user' o 'instructor'
 router.patch('/:id/role', requireAdmin, validateSchema(changeRoleSchema), changeUserRole);
 
+// Exportamos el enrutador para que app.js lo registre bajo /api/users
 export default router;

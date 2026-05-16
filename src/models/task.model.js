@@ -59,16 +59,27 @@ function deserializarUsuarios(valor) {
 // Necesario porque mysql2 puede devolver el JSON como string o como objeto según la versión
 // Retorna {} si el campo es null, undefined o no se puede parsear
 function parsearDeletedUserNames(valor) {
+    // Si valor es null, undefined o cadena vacía, retornamos un objeto vacío como fallback seguro
     if (!valor) return {};
+    // mysql2 en algunas versiones ya parsea columnas JSON automáticamente — retornamos directo
     if (typeof valor === 'object') return valor;
+    // Si llegó como string, lo parseamos con JSON.parse — el catch evita crash si está malformado
     try { return JSON.parse(valor); } catch { return {}; }
 }
 
+// formatearTarea — convierte una fila raw de MySQL al objeto camelCase que espera el frontend
+// MySQL usa snake_case (assigned_users, grade_reason, created_at) — el frontend espera camelCase
+// Parámetro: filaDb — objeto raw devuelto por pool.query con nombres de columnas en snake_case
+// Retorna: objeto con nombres camelCase listo para enviar como JSON al frontend, o null si no hay fila
 function formatearTarea(filaDb) {
+    // Si la fila es null o undefined, retornamos null — el controlador maneja ese caso con 404
     if (!filaDb) return null;
+    // Convertimos grade a Number si existe — MySQL puede retornar números como strings en ciertos tipos
+    // Si grade es null en la BD, lo mantenemos null (la tarea aún no tiene calificación)
     const grade = filaDb.grade != null ? Number(filaDb.grade) : null;
     // Si la tarea tiene nota, el estado se recalcula automáticamente para evitar inconsistencias
     // que puedan haber quedado en la BD (ej. grade=100 con status='reprobada')
+    // grade < 70 → 'reprobada' | grade >= 70 → 'completada' | sin nota → se respeta el status guardado
     const status = grade !== null
         ? (grade < 70 ? 'reprobada' : 'completada')
         : filaDb.status;
@@ -76,13 +87,20 @@ function formatearTarea(filaDb) {
         id:               filaDb.id,
         title:            filaDb.title,
         description:      filaDb.description,
+        // status: valor recalculado si hay nota, o el estado guardado en la BD si no hay nota
         status,
+        // comment: comentario de la tarea — null si no se escribió ninguno
         comment:          filaDb.comment || null,
+        // grade: nota numérica (0-100) o null si el instructor aún no calificó
         grade,
+        // gradeReason: motivo de la última edición de nota — null si no hay nota asignada
         gradeReason:      filaDb.grade_reason || null,
+        // assignedUsers: arreglo de ids de usuarios asignados — deserializado desde JSON de MySQL
         assignedUsers:    deserializarUsuarios(filaDb.assigned_users),
+        // deletedUserNames: mapa { "userId": "nombre" } de usuarios eliminados permanentemente
         deletedUserNames: parsearDeletedUserNames(filaDb.deleted_user_names),
-        createdAt:        filaDb.created_ud
+        // createdAt: timestamp de creación de la tarea — viene de la columna created_at de MySQL
+        createdAt:        filaDb.created_at,
     };
 }
 
@@ -364,26 +382,35 @@ export async function registrarNombreUsuarioEliminado(userId, userName) {
         [Number(userId)]
     );
 
+    // Si no hay tareas con este userId asignado, no hay nada que actualizar — retornamos 0
     if (rows.length === 0) return 0;
 
-    // Para cada tarea, agregar la entrada { "userId": "nombre" } al mapa
+    // Para cada tarea que tiene este userId asignado, guardamos su nombre en deleted_user_names
     for (const fila of rows) {
+        // Empezamos con un mapa vacío — lo llenamos con los datos existentes si los hay
         let mapa = {};
         try {
+            // Si la tarea ya tenía nombres guardados de usuarios eliminados anteriores, los leemos
             if (fila.deleted_user_names) {
+                // mysql2 puede devolver el campo JSON ya como objeto o como string según la versión
                 mapa = typeof fila.deleted_user_names === 'object'
                     ? fila.deleted_user_names
                     : JSON.parse(fila.deleted_user_names);
             }
+        // Si el JSON está malformado, empezamos con el mapa vacío sin crashear
         } catch { mapa = {}; }
 
+        // Agregamos la entrada nueva { "userId": "nombre" } al mapa existente
+        // String(userId) garantiza que la clave sea siempre un string para consistencia
         mapa[String(userId)] = userName;
 
+        // Guardamos el mapa actualizado en la BD como JSON string en la columna deleted_user_names
         await pool.query(
             'UPDATE tasks SET deleted_user_names = ? WHERE id = ?',
             [JSON.stringify(mapa), fila.id]
         );
     }
 
+    // Retornamos el número de tareas actualizadas — el controlador lo usa para logging
     return rows.length;
 }
