@@ -58,15 +58,14 @@ export const getTaskById = catchAsync(async (req, res) => {
 
 // ── POST /api/tasks ───────────────────────────────────────────────────────────
 // Recibe los datos del formulario de crear tarea y la guarda en MySQL
-// Cuerpo esperado: { title, description, status, assignedUsers, comment }
+// Cuerpo esperado: { title, description, status, assignedUsers }
 // La validacion de los campos la hace validateSchema(createTaskSchema) antes de llegar aqui
 export const createTask = catchAsync(async (req, res) => {
-    // Sacamos todos los campos del cuerpo  description y comment son opcionales
-    const { title, description, status, assignedUsers, comment } = req.body;
+    const { title, description, status, assignedUsers } = req.body;
 
     // Llamamos a insertTask que guarda la tarea en MySQL
     // Tambien valida que los usuarios asignados esten activos  lanza error 400 si no
-    const nuevaTarea = await insertTask({ title, description, status, assignedUsers, comment });
+    const nuevaTarea = await insertTask({ title, description, status, assignedUsers });
     // Respondemos con 201 Created y la tarea recien creada que ya incluye el id de MySQL
     return successResponse(res, 'Tarea creada correctamente', nuevaTarea, 201);
 });
@@ -160,19 +159,15 @@ export const deleteTask = catchAsync(async (req, res) => {
 });
 
 // ── PATCH /api/tasks/:id/status ───────────────────────────────────────────────
-// Cambia el estado de una tarea y opcionalmente guarda un comentario del estudiante.
+// Cambia el estado de una tarea.
 // Accesible por todos los roles  el estudiante lo usa para actualizar su progreso.
-// Cuerpo esperado: { status: '...', comment?: '...' }
+// Cuerpo esperado: { status: '...' }
 // La validacion la hace validateSchema(updateTaskStatusSchema)
 export const updateTaskStatus = catchAsync(async (req, res) => {
-    // Sacamos el id de la tarea del parametro de la URL
-    const { id }               = req.params;
-    // Sacamos el nuevo estado y el comentario opcional del cuerpo
-    const { status, comment }  = req.body;
+    const { id }        = req.params;
+    const { status }    = req.body;
 
-    // Llamamos a changeStatus pasando tambien comment para que lo persista en la BD
-    // Retorna la tarea con el estado ya actualizado, o null si el id no existe
-    const tareaActualizada = await changeStatus(id, status, comment);
+    const tareaActualizada = await changeStatus(id, status);
 
     // Si changeStatus retorno null significa que no existe ninguna tarea con ese id
     if (!tareaActualizada) {
