@@ -1,21 +1,21 @@
-// MÓDULO: schemas/user.schema.js
-// CAPA: Schemas (moldes de validación de datos)
+// MODULO: schemas/user.schema.js
+// CAPA: Schemas (moldes de validacion de datos)
 //
-// Responsabilidad única: definir la forma y las reglas que deben cumplir
+// Responsabilidad unica: definir la forma y las reglas que deben cumplir
 // los datos de un usuario antes de llegar al controlador.
 // Este archivo NO toca el DOM, NO hace peticiones HTTP, NO accede a la BD.
 //
-// Se usa Zod como librería estándar de validación de esquemas.
-// Sigue el mismo patrón que task.schema.js — molde separado de la lógica.
+// Se usa Zod como libreria estandar de validacion de esquemas.
+// Sigue el mismo patron que task.schema.js  molde separado de la logica.
 
 import { z } from 'zod';
 
-// Esquema para CREAR un usuario — POST /api/users
+// Esquema para CREAR un usuario  POST /api/users
 // Los tres campos son obligatorios para registrar un usuario en el sistema
 export const createUserSchema = z.object({
 
-    // documento: obligatorio, solo números, mínimo 5 dígitos, máximo 20
-    // Evita que se registren documentos vacíos o con letras
+    // documento: obligatorio, solo numeros, minimo 5 digitos, maximo 20
+    // Evita que se registren documentos vacios o con letras
     documento: z
         .string({
             required_error:     'El número de documento es obligatorio',
@@ -28,8 +28,8 @@ export const createUserSchema = z.object({
             'El documento solo puede contener números'
         ),
 
-    // name: obligatorio, mínimo 3 caracteres, máximo 100
-    // Evita registrar usuarios sin nombre o con nombres de un solo carácter
+    // name: obligatorio, minimo 3 caracteres, maximo 100
+    // Evita registrar usuarios sin nombre o con nombres de un solo caracter
     name: z
         .string({
             required_error:     'El nombre es obligatorio',
@@ -38,8 +38,8 @@ export const createUserSchema = z.object({
         .min(3,   'El nombre debe tener al menos 3 caracteres')
         .max(100, 'El nombre no puede exceder los 100 caracteres'),
 
-    // email: obligatorio, formato de correo electrónico válido
-    // Zod valida automáticamente que tenga @ y dominio correcto
+    // email: obligatorio, formato de correo electronico valido
+    // Zod valida automaticamente que tenga @ y dominio correcto
     email: z
         .string({
             required_error:     'El correo electrónico es obligatorio',
@@ -49,24 +49,20 @@ export const createUserSchema = z.object({
         .max(100, 'El correo no puede exceder los 100 caracteres'),
 });
 
-// Esquema para ACTUALIZAR un usuario — PUT /api/users/:id
+// Esquema para ACTUALIZAR un usuario  PUT /api/users/:id
 // Igual que createUserSchema pero todos los campos son opcionales (partial)
-// Permite actualizar solo documento, solo name, solo email o cualquier combinación
+// Permite actualizar solo documento, solo name, solo email o cualquier combinacion
 export const updateUserSchema = createUserSchema.partial();
 
 // ── SCHEMA PARA CAMBIAR ROL ──────────────────────────────────────────────────
 // PATCH /api/users/:id/role
-// Cuerpo esperado: { role: 'admin' | 'user' | 'instructor' }
-
-// Solo acepta los tres valores válidos del sistema.
-// validateSchema(changeRoleSchema) se aplica en la ruta correspondiente.
-// ACTUALIZACIÓN: se agrega 'instructor' como tercer rol válido del sistema
+// Acepta los 6 roles del sistema: 3 base + 3 adicionales
 export const changeRoleSchema = z.object({
     role: z.enum(
-        ['admin', 'user', 'instructor'],   // ← se agrega 'instructor'
+        ['admin', 'user', 'instructor', 'auditor', 'comunicador', 'soporte'],
         {
             required_error: 'El rol es obligatorio',
-            message:        "El rol debe ser: 'admin', 'user' o 'instructor'",
+            message:        "El rol debe ser uno de: admin, user, instructor, auditor, comunicador, soporte",
         }
     ),
 });

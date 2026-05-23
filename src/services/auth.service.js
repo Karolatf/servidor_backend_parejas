@@ -1,13 +1,13 @@
-// MÓDULO: services/auth.service.js
-// CAPA: Servicios (lógica de negocio de autenticación)
+// MODULO: services/auth.service.js
+// CAPA: Servicios (logica de negocio de autenticacion)
 //
-// Responsabilidad única: validar credenciales y emitir tokens JWT.
+// Responsabilidad unica: validar credenciales y emitir tokens JWT.
 // NUNCA conoce req, res ni Express.
-// Solo importa del modelo y de las librerías de seguridad.
+// Solo importa del modelo y de las librerias de seguridad.
 
-// Importamos jwt para firmar y verificar los tokens de sesión (JSON Web Tokens)
+// Importamos jwt para firmar y verificar los tokens de sesion (JSON Web Tokens)
 import jwt    from 'jsonwebtoken';
-// Importamos bcrypt para hashear contraseñas y compararlas de forma segura
+// Importamos bcrypt para hashear contrasenas y compararlas de forma segura
 import bcrypt from 'bcryptjs';
 // Importamos las funciones del modelo de usuarios que necesitamos para el login y registro
 import {
@@ -15,97 +15,113 @@ import {
     getUserById,
     getUserByDocumento,
     createUserWithPassword,
-    getUserRolesAndPermissions,   // traer los roles y permisos del sistema RBAC del usuario
+    getUserRolesAndPermissions,   // trae roles y permisos del sistema RBAC del usuario
 } from '../models/user.model.js';
 
-// Definimos las rondas de hashing para bcrypt — 10 es el estándar OWASP recomendado
-// Más rondas = más seguro pero más lento; 10 es un buen balance para proyectos como este
+// Definimos las rondas de hashing para bcrypt  10 es el estandar OWASP recomendado
+// Mas rondas = mas seguro pero mas lento; 10 es un buen balance para proyectos de este nivel
 const SALT_ROUNDS = 10;
 
 // ── hashearPassword ───────────────────────────────────────────────────────────
-// Exportamos la función hashearPassword que recibe una contraseña en texto plano
-// y retorna el hash generado por bcrypt para guardar de forma segura en la BD
+// Recibe una contrasena en texto plano y retorna el hash generado por bcrypt
+// El resultado es un string de ~60 caracteres que incluye el salt embebido automaticamente
 export async function hashearPassword(passwordPlano) {
-    // Llamamos a bcrypt.hash que aplica el algoritmo de hashing con las 10 rondas configuradas
-    // El resultado es un string de ~60 caracteres que incluye el salt embebido automáticamente
     return bcrypt.hash(passwordPlano, SALT_ROUNDS);
 }
 
 // ── generarAccessToken ────────────────────────────────────────────────────────
-// Exportamos la función generarAccessToken que recibe el objeto usuario
-// y retorna el token de corta duración (1h) firmado con JWT_SECRET
-// El payload incluye id, documento y role para que el middleware autorice sin consultar la BD
-export function generarAccessToken(usuario) {
+// Genera el token de corta duracion (1h) firmado con JWT_SECRET
+// El payload incluye: id, documento, role (primario) y permisos (arreglo plano)
+// Los permisos en el JWT permiten autorizar sin consultar la BD en cada peticion
+//
+// Parametro: usuario  objeto del usuario desde la BD
+// Parametro: permisos  arreglo plano de codigos de permiso ['tasks.create', 'users.view', ...]
+export function generarAccessToken(usuario, permisos = []) {
     return jwt.sign(
-        // payload: datos que viajan dentro del token — no incluimos información sensible como password
-        { id: usuario.id, documento: usuario.documento, role: usuario.role },
-        // secret: clave del .env con la que se firma el token — solo el servidor la conoce
+        // payload: datos que viajan dentro del token  nunca informacion sensible como password
+        {
+            id:        usuario.id,
+            documento: usuario.documento,
+            role:      usuario.role,      // rol primario para selección de vista SPA
+            permisos,                     // arreglo plano de todos los permisos acumulados
+        },
+        // secret: clave del .env con la que se firma el token  solo el servidor la conoce
         process.env.JWT_SECRET,
-        // options: el token vence en 1 hora — el cliente debe renovarlo con el refreshToken
+        // options: el token vence en 1 hora  el cliente lo renueva con el refreshToken
         { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
     );
 }
 
 // ── generarRefreshToken ───────────────────────────────────────────────────────
-// Exportamos la función generarRefreshToken que recibe el objeto usuario
-// y retorna el token de larga duración (7d) firmado con JWT_REFRESH_SECRET
-// Solo incluye el id para minimizar la información expuesta en el token de larga vida
+// Genera el token de larga duracion (7d) firmado con JWT_REFRESH_SECRET
+// Solo incluye el id para minimizar la informacion expuesta en el token de larga vida
 export function generarRefreshToken(usuario) {
     return jwt.sign(
-        // payload mínimo: solo el id — suficiente para identificar al usuario al renovar el accessToken
+        // payload minimo: solo el id  suficiente para identificar al usuario al renovar
         { id: usuario.id },
-        // secret diferente al del accessToken — firmados de forma independiente por seguridad
+        // secret diferente al del accessToken  firmados de forma independiente por seguridad
         process.env.JWT_REFRESH_SECRET,
-        // options: el token vence en 7 días — el usuario re-logea solo una vez por semana
+        // options: vence en 7 dias  el usuario re-logea solo una vez por semana
         { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
     );
 }
 
 // ── loginService ──────────────────────────────────────────────────────────────
-// Exportamos la función loginService que recibe el email y la contraseña del formulario de login
-// y verifica las credenciales del usuario contra la base de datos
-// Retorna los tokens y datos del usuario si todo es correcto, o null si las credenciales son incorrectas
+// Verifica las credenciales del usuario y genera los tokens de sesion
+// Retorna los tokens y datos del usuario si todo es correcto, o null si falla
 export async function loginService({ email, password }) {
 
-    // Buscamos el usuario en la BD por su email — retorna el objeto completo o undefined si no existe
+    // Buscamos el usuario en la BD por su email  retorna el objeto completo o undefined
     const usuario = await getUserByEmail(email);
 
-    // Si el usuario no existe en la BD retornamos null — el controlador responde 401
+    // Si el usuario no existe en la BD, retornamos null  el controlador responde 401
     if (!usuario) return null;
-    // Si el usuario no tiene contraseña hasheada (fue creado por admin sin password) retornamos null
+    // Si no tiene contrasena hasheada (fue creado por admin sin password), retornamos null
     if (!usuario.password) return null;
 
-    // Verificamos que la cuenta esté activa antes de permitir el inicio de sesión
-    // is_active = 0 significa que el admin desactivó esta cuenta manualmente
+    // Verificamos que la cuenta no este marcada como eliminada (soft delete)
+    // deleted_at IS NOT NULL significa que el admin la elimino pero aun no expiro el plazo de 30 dias
+    if (usuario.deleted_at !== null && usuario.deleted_at !== undefined) {
+        const errorEliminado = new Error(
+            'Tu cuenta ha sido eliminada. Contacta al administrador del sistema.'
+        );
+        errorEliminado.code   = 'ACCOUNT_DELETED';
+        errorEliminado.status = 403;
+        throw errorEliminado;
+    }
+
+    // Verificamos que la cuenta este activa antes de permitir el inicio de sesion
+    // is_active = 0 significa que el admin desactivo esta cuenta manualmente
     if (usuario.is_active === 0 || usuario.is_active === false) {
-        // Creamos un Error con propiedades específicas que errorMiddleware sabe leer
         const errorDesactivado = new Error(
             'Tu cuenta ha sido desactivada. Comunícate con el administrador del sistema.'
         );
-        // code identifica este error específicamente para que errorMiddleware lo trate aparte
+        // code identifica este error para que errorMiddleware lo trate aparte
         errorDesactivado.code   = 'ACCOUNT_DISABLED';
-        // status (sin "Code") es la propiedad que errorMiddleware lee para el código HTTP
         errorDesactivado.status = 403;
-        // Lanzamos el error para que catchAsync lo capture y lo pase al middleware global
         throw errorDesactivado;
     }
 
-    // Comparamos la contraseña que llegó del formulario con el hash guardado en la BD
-    // bcrypt.compare retorna true si coinciden, false si la contraseña es incorrecta
+    // Comparamos la contrasena del formulario con el hash guardado en la BD
     const passwordCorrecta = await bcrypt.compare(password, usuario.password);
-    // Si la contraseña no coincide, retornamos null — el controlador responde 401
     if (!passwordCorrecta) return null;
 
-    // Generamos el accessToken de 1h con los datos actuales del usuario
-    const accessToken  = generarAccessToken(usuario);
-    // Generamos el refreshToken de 7d que el cliente usará para renovar el accessToken
+    // Consultamos los roles y permisos del sistema RBAC para incluirlos en el JWT
+    const rolesConPermisos = await getUserRolesAndPermissions(usuario.id);
+
+    // Computamos el arreglo plano de permisos acumulando todos los roles del usuario
+    // Set elimina duplicados en caso de que varios roles compartan el mismo permiso
+    const permisosSet = new Set();
+    rolesConPermisos.forEach(function(rol) {
+        (rol.permissions || []).forEach(p => permisosSet.add(p));
+    });
+    const permisos = Array.from(permisosSet);
+
+    // Generamos los tokens incluyendo el arreglo de permisos en el accessToken
+    const accessToken  = generarAccessToken(usuario, permisos);
     const refreshToken = generarRefreshToken(usuario);
 
-    // Consultamos los roles y permisos del sistema RBAC para incluirlos en la respuesta
-    // Los consultamos desde la BD (no del JWT) para reflejar cambios en tiempo real sin re-login
-    const roles = await getUserRolesAndPermissions(usuario.id);
-
-    // Retornamos los tokens y los datos del usuario — sin el campo password por seguridad
+    // Retornamos los tokens y los datos del usuario  sin el campo password por seguridad
     return {
         accessToken,
         refreshToken,
@@ -115,66 +131,70 @@ export async function loginService({ email, password }) {
             role:      usuario.role,
             documento: usuario.documento,
             email:     usuario.email,
+            // permisos en el objeto user para que el frontend adapte la UI sin esperar el JWT
+            permisos,
+            // roles: nombres de todos los roles asignados para mostrar en el panel de perfil
+            roles:     rolesConPermisos.map(r => r.name),
         },
-        // roles: arreglo de objetos { name, permissions: [] } para que el frontend adapte la UI
-        roles,
+        // roles completos con sus permisos  util para el panel de gestion de roles en admin
+        roles: rolesConPermisos,
     };
 }
 
 // ── renovarAccessTokenService ─────────────────────────────────────────────────
-// Exportamos la función renovarAccessTokenService que recibe el refreshToken del cliente
-// y genera un nuevo accessToken de 1h si el refreshToken es válido y el usuario sigue existiendo
+// Recibe el refreshToken del cliente y genera un nuevo accessToken de 1h
+// Re-consulta los permisos desde la BD para que el token renovado este actualizado
 export async function renovarAccessTokenService(refreshToken) {
-    // Verificamos la firma del refreshToken con JWT_REFRESH_SECRET — lanza error si es inválido o expiró
-    // payload contiene los datos del token: { id, iat, exp }
+    // Verificamos la firma del refreshToken  lanza error si es invalido o expiro
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
-    // Verificamos que el usuario del token siga existiendo en la BD — pudo haber sido eliminado
+    // Verificamos que el usuario siga existiendo en la BD
     const usuario = await getUserById(payload.id);
-    // Si el usuario ya no existe en la BD, retornamos null — el cliente debe hacer login completo
     if (!usuario) return null;
 
-    // Generamos y retornamos el nuevo accessToken con los datos actuales del usuario desde la BD
-    return generarAccessToken(usuario);
+    // Re-consultamos los permisos para reflejar cambios de roles desde el ultimo login
+    const rolesConPermisos = await getUserRolesAndPermissions(usuario.id);
+    const permisosSet      = new Set();
+    rolesConPermisos.forEach(function(rol) {
+        (rol.permissions || []).forEach(p => permisosSet.add(p));
+    });
+    const permisos = Array.from(permisosSet);
+
+    // Retornamos el nuevo accessToken con los permisos actualizados
+    return generarAccessToken(usuario, permisos);
 }
 
 // ── registerService ───────────────────────────────────────────────────────────
-// Exportamos la función registerService que recibe los datos del formulario de registro
-// y crea el usuario nuevo en la BD después de verificar duplicados y hashear la contraseña
+// Crea el usuario nuevo en la BD despues de verificar duplicados y hashear la contrasena
 // Retorna { error, codigo } si hay un conflicto, o { usuario } si el registro fue exitoso
 export async function registerService({ name, documento, email, password }) {
 
-    // Verificamos que el email no esté ya registrado en la BD
+    // Verificamos que el email no este ya registrado
     const usuarioPorEmail = await getUserByEmail(email);
     if (usuarioPorEmail) {
-        // Retornamos un objeto de error en lugar de lanzar excepción — el controlador responde 409
         return { error: 'El correo electrónico ya está registrado en el sistema', codigo: 409 };
     }
 
-    // Verificamos que el número de documento no esté ya registrado en la BD
+    // Verificamos que el numero de documento no este ya registrado
     const usuarioPorDocumento = await getUserByDocumento(documento);
     if (usuarioPorDocumento) {
-        // Mismo patrón — retornamos objeto de error con código 409 (Conflicto)
         return { error: 'El número de documento ya está registrado en el sistema', codigo: 409 };
     }
 
-    // Hasheamos la contraseña con bcrypt antes de guardarla — NUNCA texto plano en la BD
-    // hashearPassword usa SALT_ROUNDS = 10 definido al inicio de este archivo
+    // Hasheamos la contrasena con bcrypt antes de guardarla  NUNCA texto plano en la BD
     const passwordHasheada = await hashearPassword(password);
 
-    // Creamos el usuario en MySQL con la contraseña ya hasheada y el rol 'user' por defecto
-    // Solo un admin puede cambiar el rol después del registro
+    // Creamos el usuario con rol 'user' por defecto
+    // createUserWithPassword tambien agrega el rol a user_roles para el sistema RBAC
     const usuarioCreado = await createUserWithPassword({
         name,
         documento,
         email,
-        password: passwordHasheada,   // guardamos el hash, nunca el texto plano
+        password: passwordHasheada,
         role: 'user',
     });
 
     // Excluimos el campo password del objeto antes de retornarlo al controlador
-    // La desestructuración con alias (_ignorado) descarta password del objeto de retorno
     const { password: _ignorado, ...usuarioSinPassword } = usuarioCreado;
-    // Retornamos el objeto de éxito con el usuario ya sin el campo password
     return { usuario: usuarioSinPassword };
 }
