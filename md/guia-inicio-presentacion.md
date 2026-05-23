@@ -1,4 +1,4 @@
-# Guía de Inicio — Configuración y Arranque del Proyecto
+# Guía de Inicio — Configuración y Arranque del Proyecto (Backend)
 
 > Sigue este orden exacto antes de empezar la presentación.
 > Si saltás un paso, el backend o el frontend no van a funcionar.
@@ -6,8 +6,6 @@
 ---
 
 ## PASO 1 — Clonar los repositorios
-
-Abrir la terminal y ejecutar uno por uno:
 
 ```bash
 # Clonar el backend
@@ -23,8 +21,6 @@ cd transferencia_dom
 
 ## PASO 2 — Instalar dependencias
 
-En cada repositorio, ejecutar `npm install` (o `npm i`) para descargar todos los paquetes de `package.json`:
-
 ```bash
 # En la carpeta del backend
 cd servidor_backend_parejas
@@ -35,13 +31,13 @@ cd transferencia_dom
 npm install
 ```
 
-> Esto descarga: Express, mysql2, jsonwebtoken, bcryptjs, zod, nodemailer, dotenv, cors y nodemon en el backend. Y Vite en el frontend.
+> Dependencias del backend: Express, mysql2, jsonwebtoken, bcryptjs, zod, nodemailer, dotenv, cors, nodemon.
 
 ---
 
 ## PASO 3 — Configurar el archivo `.env` del backend
 
-En la carpeta raíz del backend, crear el archivo `.env` con este contenido exacto:
+En la carpeta raíz del backend, crear el archivo `.env`:
 
 ```env
 # ── Base de datos ─────────────────────────────────────────────────────────────
@@ -63,9 +59,15 @@ MAILTRAP_PORT=2525
 MAILTRAP_USER=13054261a74697
 MAILTRAP_PASS=664f3a62c35007
 MAILTRAP_FROM=noreply@taskapp.sena.edu.co
+
+# ── Puerto del servidor ────────────────────────────────────────────────────────
+PORT=3000
+# NOTA EXPOSICIÓN: el servidor escucha en 0.0.0.0:3000 (app.js ya tiene el 0.0.0.0)
+# Esto permite que otros dispositivos en la misma red se conecten al backend
+# Usar con: http://192.168.X.X:3000 desde el frontend (cambiar en config.js del frontend)
 ```
 
-> El archivo `.env` está en el `.gitignore` — nunca se sube al repositorio. Por eso hay que crearlo manualmente en cada máquina.
+> El archivo `.env` está en `.gitignore` — nunca se sube al repositorio. Hay que crearlo manualmente en cada máquina.
 
 ---
 
@@ -79,16 +81,11 @@ MAILTRAP_FROM=noreply@taskapp.sena.edu.co
 
 ### 4.2 — Crear el usuario `app_user` desde la conexión root
 
-Abrir MySQL Workbench y conectarse con el usuario `root`. Luego ejecutar el contenido del archivo `connection.sql` (está en la raíz del backend o en `docs/`). El script hace esto:
+Abrir MySQL Workbench, conectarse con `root`, y ejecutar `database/connection.sql`:
 
 ```sql
--- Crear el usuario de la aplicación
 CREATE USER IF NOT EXISTS 'app_user'@'localhost' IDENTIFIED BY 'TORRES_2007';
-
--- Darle todos los permisos sobre la base de datos del proyecto
 GRANT ALL PRIVILEGES ON gestion_tareas_sena.* TO 'app_user'@'localhost';
-
--- Aplicar los cambios de permisos
 FLUSH PRIVILEGES;
 ```
 
@@ -104,80 +101,133 @@ FLUSH PRIVILEGES;
 
 ### 4.4 — Crear las tablas del sistema (como `app_user`)
 
-Conectarse como `app_user` y ejecutar los scripts en este orden:
+Conectarse como `app_user` y ejecutar los scripts en este orden exacto:
 
-1. **`schema.sql`** — crea la base de datos `gestion_tareas_sena` y todas las tablas: `users`, `tasks`, `calendar_events`, `user_notes`, `roles`, `permissions`, `user_roles`, `role_permissions`.
+1. **`database/schema.sql`** — crea la base de datos `gestion_tareas_sena` y todas las tablas:
+   - RBAC: `roles`, `permissions`, `role_permissions`, `user_roles`, `user_extra_permissions`
+   - Usuarios: `users` (con soft delete)
+   - Tareas: `tasks`, `task_users`, `task_comments`, `task_state_notifications`, `task_state_notification_recipients`
+   - Calendario: `calendar_events`, `user_notes`
+   - Comunicador: `comunicador_anuncios`, `comunicador_notificaciones`, `comunicador_notificaciones_roles`, `comunicador_notificaciones_leidas`
 
-2. **`rbac.sql`** — inserta los roles (`admin`, `instructor`, `user`) y los permisos del sistema (`tasks.create`, `users.delete`, etc.) y los vincula con sus roles en `role_permissions`.
+2. **`database/seed.sql`** — inserta los 6 roles, todos los permisos, y los asigna a sus roles en `role_permissions`.
 
-> Ejecutar `schema.sql` primero siempre. Si se ejecuta `rbac.sql` antes, fallará porque las tablas no existen todavía.
+> **Importante:** ejecutar `schema.sql` SIEMPRE antes que `seed.sql`. Si `schema.sql` ya se ejecutó y las tablas existen, es seguro re-ejecutarlo (`IF NOT EXISTS` lo protege).
 
 ---
 
-## PASO 5 — Cargar los datos de prueba en la base de datos
+## PASO 5 — Promover usuarios a admin (después del primer registro)
 
-Ejecutar en MySQL Workbench (como `app_user`) el archivo de datos de prueba si existe (normalmente `seed.sql` o `data.sql`). Esto crea usuarios de los tres roles, tareas en varios estados y eventos de calendario listos para la demo.
+Después de que Karol y Sebastián se registren desde el navegador:
 
-Si no hay archivo de seed, crear manualmente al menos:
-- 1 usuario `admin`
-- 1 usuario `instructor`
+```sql
+-- 1. Cambiar el rol primario a admin
+UPDATE users
+SET role = 'admin'
+WHERE documento IN ('1097497001', '1234567002');
+
+-- 2. Quitar el rol 'user' de user_roles
+DELETE ur
+FROM user_roles ur
+INNER JOIN users u ON u.id = ur.user_id
+INNER JOIN roles r ON r.id = ur.role_id
+WHERE u.documento IN ('1097497001', '1234567002')
+  AND r.name = 'user';
+
+-- 3. Agregar el rol 'admin' a user_roles
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT u.id, r.id
+FROM users u, roles r
+WHERE u.documento IN ('1097497001', '1234567002')
+  AND r.name = 'admin';
+```
+
+---
+
+## PASO 6 — Datos de prueba
+
+Registrar desde el navegador (o insertar manualmente):
+- 1 usuario `instructor` (cualquier correo y documento)
 - 2 usuarios `user` (estudiantes)
-- Algunas tareas en estados `pendiente`, `en_progreso`, `pendiente_aprobacion`
+
+Desde el panel de admin, crear tareas en varios estados y asignarlas a los estudiantes.
+
+Para la demo de roles adicionales:
+- En el panel de admin, ir a la tabla de usuarios → "Gestionar Rol" de un usuario
+- Asignar un rol adicional (ej: `auditor`) con el permiso `auditor.reportes`
+- Iniciar sesión con ese usuario para ver la sección extra en el sidebar
 
 ---
 
-## PASO 6 — Importar la colección y el entorno de Postman
+## PASO 7 — Importar la colección de Postman
 
-1. Abrir Postman.
-2. Hacer clic en **Import**.
-3. Importar el archivo `.json` de la colección (está en la carpeta `docs/` o `postman/` del backend).
-4. Importar también el archivo de **environment** (`.json`) que tiene las variables `baseUrl`, `token`, etc.
-5. Seleccionar el environment importado en el selector de Postman (esquina superior derecha).
+1. Abrir Postman
+2. Clic en **Import**
+3. Importar el archivo `.json` de la colección (está en `postman/`)
+4. Importar también el archivo de **environment** con las variables `baseUrl` y `token`
+5. Seleccionar el environment importado en el selector de Postman
 
 ---
 
-## PASO 7 — Abrir los archivos de documentación
+## PASO 8 — Abrir los archivos de documentación
 
 Antes de arrancar:
 
-- Backend: abrir `docs/04-exposicion/guia-exposicion.md`
-- Frontend: abrir `md/guia-exposicion.md`
-- Tener a mano `docs/04-exposicion/preguntas-frecuentes.md` por si el instructor pregunta algo
+- Backend: `md/guia-exposicion.md` → seguir el guión
+- Backend: `md/consultas-sql.md` → tener a mano las consultas de demostración
+- Frontend: `md/pitch.md` → estudiar el gancho de apertura
+- Frontend: `md/guia-exposicion.md` → seguir el guión completo
 
 ---
 
-## PASO 8 — Arrancar los servidores
+## PASO 9 — Arrancar los servidores
 
-**Backend** (en su terminal):
+### Backend (terminal 1):
 ```bash
 cd servidor_backend_parejas
 npm run dev
 ```
-> Debe mostrar: `Servidor escuchando en http://localhost:3000` y `Conexión con MySQL establecida correctamente`
+Debe mostrar:
+- `Servidor escuchando en http://localhost:3000`
+- `Conexión con MySQL establecida correctamente`
 
-**Frontend** (en otra terminal):
+### Frontend — Opción A Desarrollo (terminal 2):
 ```bash
 cd transferencia_dom
 npm run dev
+# Abre http://localhost:5173
 ```
-> Debe mostrar: `VITE v5.x.x  ready in Xms → Local: http://localhost:5173`
+
+### Frontend — Opción B Producción con IP (terminal 2):
+```bash
+# Primero: editar src/utils/config.js → API_BASE_URL = 'http://192.168.X.X:3000'
+cd transferencia_dom
+npm run build
+cd dist
+npx serve -l 3001
+# Abre http://192.168.X.X:3001 desde cualquier dispositivo de la red
+```
 
 ---
 
-## PASO 9 — Empezar la presentación
+## PASO 10 — Verificar antes de empezar
 
-- Abrir el navegador en `http://localhost:5173`
-- Cerrar sesión si hay alguna activa
-- Seguir la `guia-exposicion.md` paso a paso
+1. Abrir el navegador en la URL del frontend
+2. Hacer login como admin — debe cargar el panel azul
+3. Verificar la tabla de usuarios y tareas con datos de prueba
+4. Si todo funciona → la presentación puede empezar
 
 ---
 
-## Checklist rápido antes de empezar
+## Checklist rápido
 
-- [ ] Backend corriendo en puerto 3000
-- [ ] Frontend corriendo en puerto 5173
-- [ ] MySQL conectado (ver mensaje en consola del backend)
-- [ ] Datos de prueba cargados (al menos 1 admin, 1 instructor, 2 estudiantes)
-- [ ] Postman con la colección y el environment importados
 - [ ] `.env` creado con los datos correctos
-- [ ] Archivos de documentación abiertos en VSCode
+- [ ] Backend corriendo en puerto 3000 (ver consola)
+- [ ] MySQL conectado (ver mensaje en consola del backend)
+- [ ] Scripts `schema.sql` y `seed.sql` ejecutados en orden
+- [ ] Usuarios de los 3 roles principales registrados (admin, instructor, estudiante)
+- [ ] Tareas en varios estados (pendiente, en_progreso, pendiente_aprobacion, completada)
+- [ ] Al menos 1 usuario con rol adicional para demo de secciones extra
+- [ ] Postman con colección y environment listos
+- [ ] Frontend corriendo (localhost:5173 o IP:3001)
+- [ ] Documentación abierta en VSCode

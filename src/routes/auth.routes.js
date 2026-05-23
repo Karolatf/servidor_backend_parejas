@@ -1,8 +1,8 @@
-// MÓDULO: routes/auth.routes.js
+// MODULO: routes/auth.routes.js
 // CAPA: Rutas
 //
-// Responsabilidad única: definir los endpoints de autenticación.
-// ACTUALIZACIÓN v4.0: se agregan las rutas del flujo de recuperación de contraseña.
+// Responsabilidad unica: definir los endpoints de autenticacion.
+// ACTUALIZACION v4.0: se agregan las rutas del flujo de recuperacion de contrasena.
  
 import { Router } from 'express';
 import {
@@ -18,23 +18,23 @@ import { loginSchema, registerSchema } from '../../schemas/auth.schema.js';
  
 const router = Router();
  
-// POST /api/auth/login — valida email y password antes de llegar al controlador
+// POST /api/auth/login  valida email y password antes de llegar al controlador
 router.post('/login', validateSchema(loginSchema), login);
  
-// POST /api/auth/refresh — renueva el accessToken con el refreshToken
+// POST /api/auth/refresh  renueva el accessToken con el refreshToken
 router.post('/refresh', refresh);
  
-// POST /api/auth/register — registro de usuarios nuevos desde la web
+// POST /api/auth/register  registro de usuarios nuevos desde la web
 router.post('/register', validateSchema(registerSchema), register);
  
-// ── FLUJO DE RECUPERACIÓN DE CONTRASEÑA (3 pasos) ───────────────────────────
-// Paso 1: el usuario ingresa su email para recibir el código por Mailtrap
+// ── FLUJO DE RECUPERACION DE CONTRASENA (3 pasos) ───────────────────────────
+// Paso 1: el usuario ingresa su email para recibir el codigo por Mailtrap
 router.post('/forgot-password', forgotPassword);
  
-// Paso 2: el usuario ingresa el código de 6 dígitos para verificarlo
+// Paso 2: el usuario ingresa el codigo de 6 digitos para verificarlo
 router.post('/verify-reset-code', verifyResetCode);
  
-// Paso 3: el usuario ingresa la nueva contraseña (requiere haber pasado el paso 2)
+// Paso 3: el usuario ingresa la nueva contrasena (requiere haber pasado el paso 2)
 router.post('/reset-password', resetPassword);
  
 export default router;

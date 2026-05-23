@@ -1,198 +1,118 @@
-// MÓDULO: models/task.model.js
-// CAPA: Modelo (datos y operaciones sobre la tabla tasks en MySQL)
+// MODULO: models/task.model.js
+// CAPA: Modelo (datos y operaciones sobre las tablas tasks y task_users en MySQL)
 //
-// Responsabilidad única: interactuar con la tabla tasks de MySQL.
+// Responsabilidad unica: interactuar con las tablas tasks y task_users de MySQL.
 // NUNCA conoce req, res ni Express.
 //
-// CORRECCIONES APLICADAS EN ESTA VERSIÓN:
-//   1. formatearTarea()  → incluye el campo 'comment' que faltaba.
-//   2. createTask()      → inserta el campo 'comment' en el INSERT.
-//   3. updateTask()      → permite actualizar el campo 'comment'.
+// NORMALIZACION (reemplaza asigned_users JSON):
+//   Las asignaciones de usuarios se gestionan en la tabla pivote task_users.
+//   user_id puede ser NULL si el usuario fue eliminado forzosamente (ON DELETE SET NULL).
+//   user_name_snapshot preserva el nombre aunque el usuario ya no exista en la BD.
 //
-// pool.query retorna [filas, metadatos] — desestructuramos con [rows]
-// para tomar solo las filas y descartar los metadatos que no necesitamos.
+// pool.query retorna [filas, metadatos]  desestructuramos con [rows]
 
-// pool es el grupo de conexiones a MySQL configurado en db.connection.js
-// Reutiliza conexiones existentes en lugar de abrir una nueva por cada query
 import pool from '../database/db.connection.js';
 
-// ── FUNCIONES PRIVADAS DE SERIALIZACIÓN ─────────────────────────────────────
-
-// serializarUsuarios — convierte arreglo JS a JSON string para guardar en MySQL
-// MySQL no tiene tipo array nativo, así que los IDs de usuarios asignados
-// se guardan como texto JSON en la columna assigned_users
-// Ejemplo: [1, 2, 3] → '[1,2,3]'
-// Number(id) garantiza que todos los ids sean números y no strings
-function serializarUsuarios(arreglo) {
-    // Si no llega nada o no es un arreglo, guardar un arreglo vacío
-    if (!arreglo || !Array.isArray(arreglo)) return JSON.stringify([]);
-    // map convierte cada id a Number para consistencia antes de serializar
-    return JSON.stringify(arreglo.map(id => Number(id)));
-}
-
-// deserializarUsuarios — convierte el valor de la columna assigned_users a arreglo JS
-// MySQL puede retornar el campo ya como arreglo (columna JSON nativa) o como string
-// dependiendo de la versión de mysql2 y la configuración de MySQL
-// El try/catch evita que JSON.parse rompa la aplicación si el valor está malformado
-function deserializarUsuarios(valor) {
-    // Si mysql2 ya lo parseó como arreglo, retornarlo directamente
-    if (Array.isArray(valor)) return valor;
-    try {
-        // JSON.parse convierte el string '[1,2,3]' al arreglo [1, 2, 3]
-        // Si valor es null o undefined, usamos '[]' como fallback
-        return JSON.parse(valor || '[]');
-    } catch {
-        // Si el JSON está malformado, retornar arreglo vacío en lugar de crashear
-        return [];
-    }
-}
-
-// formatearTarea — convierte una fila raw de MySQL a un objeto con nombres camelCase
-// MySQL usa snake_case (assigned_users, created_at) — el frontend espera camelCase
-// CORRECCIÓN: se agrega el campo 'comment' que faltaba en la versión anterior.
-//   Sin este campo, el frontend enviaba comment al editar una tarea,
-//   pero la respuesta del servidor nunca lo incluía → la tabla mostraba '—' siempre.
-//
-// Parámetro: filaDb — objeto raw devuelto por pool.query (nombres con underscore)
-// Retorna: objeto con nombres camelCase listo para enviar como JSON al frontend
-// parsearDeletedUserNames — convierte el campo deleted_user_names de MySQL a objeto JS
-// Necesario porque mysql2 puede devolver el JSON como string o como objeto según la versión
-// Retorna {} si el campo es null, undefined o no se puede parsear
-function parsearDeletedUserNames(valor) {
-    // Si valor es null, undefined o cadena vacía, retornamos un objeto vacío como fallback seguro
-    if (!valor) return {};
-    // mysql2 en algunas versiones ya parsea columnas JSON automáticamente — retornamos directo
-    if (typeof valor === 'object') return valor;
-    // Si llegó como string, lo parseamos con JSON.parse — el catch evita crash si está malformado
-    try { return JSON.parse(valor); } catch { return {}; }
-}
-
-// formatearTarea — convierte una fila raw de MySQL al objeto camelCase que espera el frontend
-// MySQL usa snake_case (assigned_users, grade_reason, created_at) — el frontend espera camelCase
-// Parámetro: filaDb — objeto raw devuelto por pool.query con nombres de columnas en snake_case
-// Retorna: objeto con nombres camelCase listo para enviar como JSON al frontend, o null si no hay fila
+// ── FUNCION PRIVADA: formatearTarea ──────────────────────────────────────────
+// Convierte una fila raw de MySQL al objeto camelCase que espera el frontend
+// Acepta el resultado de las queries que incluyen los campos aggregados de task_users
+// Parametro: filaDb  objeto raw de pool.query con campos en snake_case
+// Retorna: objeto camelCase listo para enviar como JSON al frontend, o null si no hay fila
 function formatearTarea(filaDb) {
-    // Si la fila es null o undefined, retornamos null — el controlador maneja ese caso con 404
     if (!filaDb) return null;
-    // Convertimos grade a Number si existe — MySQL puede retornar números como strings en ciertos tipos
-    // Si grade es null en la BD, lo mantenemos null (la tarea aún no tiene calificación)
+
+    // Convertimos grade a Number  MySQL puede retornar decimales como strings
     const grade = filaDb.grade != null ? Number(filaDb.grade) : null;
-    // Si la tarea tiene nota, el estado se recalcula automáticamente para evitar inconsistencias
-    // que puedan haber quedado en la BD (ej. grade=100 con status='reprobada')
+
+    // Si la tarea tiene nota, el estado se recalcula para evitar inconsistencias en la BD
     // grade < 70 → 'reprobada' | grade >= 70 → 'completada' | sin nota → se respeta el status guardado
     const status = grade !== null
         ? (grade < 70 ? 'reprobada' : 'completada')
         : filaDb.status;
+
+    // assignedUsers: arreglo de ids de usuarios asignados extraido del campo aggregado
+    // assigned_user_ids viene de GROUP_CONCAT(tu.user_id) en la query JOIN
+    const assignedUsers = filaDb.assigned_user_ids
+        ? String(filaDb.assigned_user_ids).split(',').map(Number).filter(Boolean)
+        : [];
+
     return {
-        id:               filaDb.id,
-        title:            filaDb.title,
-        description:      filaDb.description,
-        // status: valor recalculado si hay nota, o el estado guardado en la BD si no hay nota
+        id:                   filaDb.id,
+        title:                filaDb.title,
+        description:          filaDb.description,
+        // status: recalculado si hay nota, o el estado guardado en la BD si no hay nota
         status,
-        // comment: comentario de la tarea — null si no se escribió ninguno
-        comment:          filaDb.comment || null,
-        // grade: nota numérica (0-100) o null si el instructor aún no calificó
+        // comment: comentario de seguimiento  null si no se escribio ninguno
+        comment:              filaDb.comment || null,
+        // grade: nota numerica (0-100) o null si el instructor aun no califico
         grade,
-        // gradeReason: motivo de la última edición de nota — null si no hay nota asignada
-        gradeReason:      filaDb.grade_reason || null,
-        // assignedUsers: arreglo de ids de usuarios asignados — deserializado desde JSON de MySQL
-        assignedUsers:    deserializarUsuarios(filaDb.assigned_users),
-        // deletedUserNames: mapa { "userId": "nombre" } de usuarios eliminados permanentemente
-        deletedUserNames: parsearDeletedUserNames(filaDb.deleted_user_names),
-        // createdAt: timestamp de creación de la tarea — viene de la columna created_at de MySQL
-        createdAt:        filaDb.created_at,
+        // gradeReason: motivo de la calificacion escrito por el instructor  null si no hay nota
+        gradeReason:          filaDb.grade_reason || null,
+        // changeReason: justificacion cuando el instructor cambia estado sin calificar
+        changeReason:         filaDb.change_reason || null,
+        // assignedUsers: arreglo de ids de usuarios activos o eliminados con soft delete
+        assignedUsers,
+        // assignedUsersDisplay: string con nombres legibles para mostrar en la tabla
+        assignedUsersDisplay: filaDb.assigned_users_display || null,
+        // createdAt: timestamp de creacion de la tarea
+        createdAt:            filaDb.created_at,
     };
 }
 
-// ── FUNCIONES EXPORTADAS (usadas por el controlador) ────────────────────────
-
-// getAllTasks — retorna todas las tareas con los nombres de usuarios resueltos
-// Se usa en GET /api/tasks (solo admin e instructor pueden ver todas)
-// Hace dos queries: una para tareas y otra para usuarios, luego las combina en memoria
-// assignedUsersDisplay: string formateado listo para mostrar en la tabla del panel
-export async function getAllTasks() {
-    // Query 1: obtener todas las tareas de la tabla tasks
-    const [rows]     = await pool.query('SELECT * FROM tasks');
-    // Query 2: obtener id, name y documento de todos los usuarios para resolver los IDs
-    // Solo se traen los campos necesarios, no todo el objeto usuario (evita exponer passwords)
-    const [usuarios] = await pool.query('SELECT id, name, documento, is_active FROM users');
-
-    // Para cada tarea, resolver los IDs de usuarios asignados a nombres legibles
-    return rows.map(function(fila) {
-        // Convertir la fila raw de MySQL al formato camelCase del frontend
-        const tarea = formatearTarea(fila);
-
-        // Resolver cada ID del arreglo assignedUsers al nombre del usuario correspondiente
-        const nombres = tarea.assignedUsers.map(function(id) {
-            const encontrado = usuarios.find(u => u.id === Number(id));
-            if (!encontrado) {
-                // Buscar en el mapa de nombres de usuarios eliminados permanentemente
-                const nombreGuardado = tarea.deletedUserNames[String(id)];
-                return nombreGuardado ? `${nombreGuardado} (eliminado)` : `[Usuario eliminado]`;
-            }
-            if (encontrado.is_active === 0) return `${encontrado.name} (inactivo)`;
-            return encontrado.name;
-        });
-
-        // assignedUsersDisplay: string con los nombres separados por coma
-        // Si no hay usuarios asignados, null (el frontend muestra '—')
-        tarea.assignedUsersDisplay = nombres.length > 0 ? nombres.join(', ') : null;
-
-        // assignedDocumentos: permite al panel admin filtrar por documento de usuario
-        tarea.assignedDocumentos = tarea.assignedUsers.map(function(id) {
-            const encontrado = usuarios.find(u => u.id === Number(id));
-            // toString() convierte el documento numérico a string para la búsqueda de texto
-            return encontrado ? encontrado.documento.toString() : null;
-        }).filter(Boolean);
-
-        return tarea;
-    });
-}
-
-// getTaskById — busca una tarea por su id numérico
-// Se usa internamente por casi todas las funciones del modelo
-// El ? es un placeholder que mysql2 reemplaza de forma segura (evita SQL injection)
-// Retorna la tarea formateada, o null si no existe ninguna tarea con ese id
-export async function getTaskById(id) {
+// ── QUERY BASE: _selectTareasConUsuarios ──────────────────────────────────────
+// Query reutilizable que obtiene tareas con los datos de usuarios asignados aggregados
+// GROUP BY t.id agrupa multiples filas (una por usuario) en una sola fila por tarea
+// GROUP_CONCAT construye strings concatenados de ids y nombres con el separador ','
+// CASE maneja tres casos: usuario activo, inactivo o eliminado permanentemente (tu.user_id NULL)
+async function _selectTareasConUsuarios(where = '', params = []) {
     const [rows] = await pool.query(
-        'SELECT * FROM tasks WHERE id = ?',
-        [Number(id)]
+        `SELECT
+            t.*,
+            GROUP_CONCAT(DISTINCT tu.user_id ORDER BY tu.user_id SEPARATOR ',')
+                AS assigned_user_ids,
+            GROUP_CONCAT(DISTINCT
+                CASE
+                    WHEN tu.user_id IS NULL THEN CONCAT(tu.user_name_snapshot, ' (eliminado)')
+                    WHEN u.is_active = 0    THEN CONCAT(u.name, ' (inactivo)')
+                    ELSE u.name
+                END
+                ORDER BY tu.user_id SEPARATOR ', '
+            ) AS assigned_users_display
+        FROM tasks t
+        LEFT JOIN task_users tu ON tu.task_id = t.id
+        LEFT JOIN users u       ON u.id = tu.user_id
+        ${where}
+        GROUP BY t.id
+        ORDER BY t.id DESC`,
+        params
     );
-    if (!rows[0]) return null;
-
-    const tarea = formatearTarea(rows[0]);
-
-    // Resolver assignedUsersDisplay igual que getAllTasks
-    // Sin esto, GET /api/tasks/:id devuelve los IDs pero no los nombres
-    const [usuarios] = await pool.query('SELECT id, name, documento, is_active FROM users');
-    const nombres = tarea.assignedUsers.map(function(uid) {
-        const u = usuarios.find(u => u.id === Number(uid));
-        if (!u) {
-            const guardado = tarea.deletedUserNames[String(uid)];
-            return guardado ? `${guardado} (eliminado)` : '[Usuario eliminado]';
-        }
-        return u.is_active === 0 ? `${u.name} (inactivo)` : u.name;
-    });
-    tarea.assignedUsersDisplay = nombres.length > 0 ? nombres.join(', ') : null;
-    tarea.assignedDocumentos   = tarea.assignedUsers.map(function(uid) {
-        const u = usuarios.find(u => u.id === Number(uid));
-        return u ? u.documento.toString() : null;
-    }).filter(Boolean);
-
-    return tarea;
+    return rows;
 }
 
-// createTask — inserta una tarea nueva en la tabla tasks
-// CORRECCIÓN: se agrega 'comment' al INSERT para persistir el campo en MySQL.
-//   En la versión anterior el INSERT no incluía comment, por lo que siempre
-//   quedaba NULL en la base de datos aunque el frontend lo enviara.
+// ── getAllTasks ───────────────────────────────────────────────────────────────
+// Retorna todas las tareas del sistema con los nombres de usuarios resueltos
+// Se usa en GET /api/tasks (solo admin e instructor pueden ver todas)
+export async function getAllTasks() {
+    const rows = await _selectTareasConUsuarios();
+    return rows.map(formatearTarea);
+}
+
+// ── getTaskById ───────────────────────────────────────────────────────────────
+// Busca una tarea por su id numerico  retorna el objeto formateado o null si no existe
+// Se usa internamente por casi todas las funciones del modelo
+export async function getTaskById(id) {
+    const rows = await _selectTareasConUsuarios('WHERE t.id = ?', [Number(id)]);
+    return rows[0] ? formatearTarea(rows[0]) : null;
+}
+
+// ── createTask ────────────────────────────────────────────────────────────────
+// Inserta una tarea nueva en la tabla tasks y agrega los usuarios a task_users
+// Valida que ningun usuario asignado este inactivo antes de crear la tarea
 //
-// Los parámetros tienen valores por defecto para los campos opcionales:
+// Parametros con valores por defecto para los campos opcionales:
 //   status       → 'pendiente' si el frontend no especifica estado
-//   assignedUsers → [] si no se asigna ningún usuario
+//   assignedUsers → [] si no se asigna ningun usuario
 //   comment      → null si no se escribe comentario
-//
-// Retorna: el objeto de la tarea recién creada con el id asignado por MySQL
 export async function createTask({
     title,
     description,
@@ -200,7 +120,7 @@ export async function createTask({
     assignedUsers = [],
     comment       = null
 }) {
-    // Validar que ninguno de los usuarios asignados esté inactivo
+    // Verificamos que ninguno de los usuarios asignados este inactivo antes de crear
     if (assignedUsers && assignedUsers.length > 0) {
         const [usuarios] = await pool.query(
             'SELECT id, name, is_active FROM users WHERE id IN (?)',
@@ -217,203 +137,287 @@ export async function createTask({
         }
     }
 
-    // INSERT con los 5 campos — el orden de los ? debe coincidir con VALUES
+    // Insertamos la tarea en la tabla tasks  grade y grade_reason empiezan en null
     const [result] = await pool.query(
-        'INSERT INTO tasks (title, description, status, assigned_users, comment, grade, grade_reason) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [
-            title,
-            description || '',
-            status,
-            serializarUsuarios(assignedUsers),
-            comment || null,
-            null,   // grade empieza null — se asigna cuando el instructor califica
-            null    // grade_reason empieza null
-        ]
+        'INSERT INTO tasks (title, description, status, comment) VALUES (?, ?, ?, ?)',
+        [title, description || '', status, comment || null]
     );
-    // result.insertId contiene el id AUTO_INCREMENT que MySQL asignó a la nueva fila
-    // Se llama a getTaskById para retornar el objeto completo y formateado
-    return getTaskById(result.insertId);
+    const taskId = result.insertId;
+
+    // Asignamos los usuarios en la tabla task_users si hay alguno
+    if (assignedUsers && assignedUsers.length > 0) {
+        await _asignarUsuariosEnPivot(taskId, assignedUsers);
+    }
+
+    // Retornamos la tarea completa con los usuarios ya resueltos
+    return getTaskById(taskId);
 }
 
-// updateTask — actualiza los campos de una tarea existente
-// CORRECCIÓN: se agrega 'comment' a la lista de campos actualizables.
-//   En la versión anterior el modelo ignoraba comment aunque el frontend lo enviara.
-//
-// Solo actualiza los campos que llegaron en el body (undefined = no se envió = no se toca)
+// ── updateTask ────────────────────────────────────────────────────────────────
+// Actualiza los campos de una tarea existente
+// Solo actualiza los campos que llegaron en el body (undefined = no se envio = no se toca)
+// Si llegan assignedUsers: sincroniza completamente la tabla task_users (reemplaza todos)
 // Retorna: la tarea actualizada, o null si el id no existe
 export async function updateTask(id, campos) {
-    // Verificar que la tarea existe antes de intentar actualizar
     const existente = await getTaskById(id);
-    // Si no existe retornamos null para que el controlador responda 404
     if (!existente) return null;
 
-    // Construir el objeto con los campos a actualizar en la BD (nombres de columnas MySQL)
+    // Construimos el objeto con los campos a actualizar en la tabla tasks
     const camposDb = {};
 
-    // Verificar campo por campo si llegó en el body (undefined = no enviar)
-    if (campos.title         !== undefined) camposDb.title          = campos.title;
-    if (campos.description   !== undefined) camposDb.description    = campos.description;
-    // status: se aplica solo si no viene grade (grade siempre prevalece)
-    if (campos.status !== undefined && campos.grade === undefined) camposDb.status = campos.status;
-    // assignedUsers del frontend → assigned_users en MySQL (snake_case de la BD)
-    if (campos.assignedUsers !== undefined) camposDb.assigned_users = serializarUsuarios(campos.assignedUsers);
-    // comment
-    if (campos.comment !== undefined) camposDb.comment = campos.comment || null;
-    // grade: cuando se actualiza, el estado se recalcula automáticamente para mantener consistencia
-    // grade < 70 → reprobada | grade >= 70 → completada (nunca quedan desincronizados)
+    if (campos.title       !== undefined) camposDb.title       = campos.title;
+    if (campos.description !== undefined) camposDb.description = campos.description;
+    if (campos.comment     !== undefined) camposDb.comment     = campos.comment || null;
+
+    // grade: cuando se actualiza, el estado se recalcula para mantener consistencia
     if (campos.grade !== undefined) {
-        camposDb.grade  = (campos.grade !== null && campos.grade !== '') ? Number(campos.grade) : null;
+        camposDb.grade = (campos.grade !== null && campos.grade !== '') ? Number(campos.grade) : null;
         if (camposDb.grade !== null) {
             camposDb.status = camposDb.grade < 70 ? 'reprobada' : 'completada';
         }
     }
-    // grade_reason: motivo de la última edición de nota
-    if (campos.gradeReason !== undefined) camposDb.grade_reason = campos.gradeReason || null;
+    if (campos.gradeReason  !== undefined) camposDb.grade_reason  = campos.gradeReason  || null;
+    if (campos.changeReason !== undefined) camposDb.change_reason = campos.changeReason || null;
 
-    // Si no llegó ningún campo válido, no ejecutar el UPDATE innecesariamente
-    // Retornar la tarea sin cambios
-    if (Object.keys(camposDb).length === 0) return existente;
+    // Cuando el instructor cambia el status a un estado no final (pendiente / en_progreso /
+    // pendiente_aprobacion), la nota se borra para que el estudiante pueda rehacer la tarea.
+    // Tambien cubre el flujo "solo cambiar estado" donde grade llega null explicitamente
+    // (null !== undefined, por eso se evalua por separado).
+    const ESTADOS_ACTIVOS = ['pendiente', 'en_progreso', 'pendiente_aprobacion'];
+    if (campos.status !== undefined && (campos.grade === undefined || campos.grade === null)) {
+        camposDb.status = campos.status;
+        if (ESTADOS_ACTIVOS.includes(campos.status)) {
+            camposDb.grade        = null;
+            camposDb.grade_reason = null;
+        }
+    }
 
-    // Construir dinámicamente la parte SET: "title = ?, status = ?, assigned_users = ?"
-    // map genera ["title = ?", "status = ?"] y join los une con comas
-    const parteSet = Object.keys(camposDb).map(c => `${c} = ?`).join(', ');
+    // Si hay campos de tabla tasks que actualizar, ejecutamos el UPDATE
+    if (Object.keys(camposDb).length > 0) {
+        const parteSet = Object.keys(camposDb).map(c => `${c} = ?`).join(', ');
+        await pool.query(
+            `UPDATE tasks SET ${parteSet} WHERE id = ?`,
+            [...Object.values(camposDb), Number(id)]
+        );
+    }
 
-    // Ejecutar el UPDATE — el spread agrega todos los valores y al final el id del WHERE
-    await pool.query(
-        `UPDATE tasks SET ${parteSet} WHERE id = ?`,
-        [...Object.values(camposDb), Number(id)]
-    );
+    // Si llegaron assignedUsers, sincronizamos task_users completamente
+    // Esto reemplaza toda la asignacion existente con la nueva lista enviada
+    if (campos.assignedUsers !== undefined) {
+        await _sincronizarAsignaciones(Number(id), campos.assignedUsers);
+    }
 
-    // Retornar la tarea con los datos ya actualizados desde MySQL
     return getTaskById(id);
 }
 
-// deleteTask — elimina una tarea de la tabla tasks permanentemente
-// Guarda el objeto antes de eliminarlo para retornarlo como confirmación
-// Retorna: el objeto de la tarea eliminada, o null si el id no existía
+// ── deleteTask ────────────────────────────────────────────────────────────────
+// Elimina una tarea permanentemente de la tabla tasks
+// Las filas de task_users y task_comments se borran en cascada (FK ON DELETE CASCADE)
+// Retorna: el objeto de la tarea antes de eliminarla, o null si no existia
 export async function deleteTask(id) {
-    // Verificar que la tarea existe antes de intentar eliminar
     const aEliminar = await getTaskById(id);
-    // Si no existe retornamos null para que el controlador responda 404
     if (!aEliminar) return null;
 
-    // DELETE con placeholder seguro — elimina la fila de la tabla tasks
     await pool.query('DELETE FROM tasks WHERE id = ?', [Number(id)]);
 
-    // Retornar el objeto de la tarea antes de que se eliminara como confirmación
     return aEliminar;
 }
 
-// filterTasks — retorna tareas filtradas por estado y/o usuario asignado
+// ── filterTasks ───────────────────────────────────────────────────────────────
+// Retorna tareas filtradas por estado y/o usuario asignado
 // Se usa en GET /api/tasks/filter?status=pendiente&userId=1
-// Carga todas las tareas en memoria y luego filtra — funciona bien para volúmenes pequeños
 export async function filterTasks({ status, userId } = {}) {
-    // getAllTasks ya resuelve los nombres de usuarios y agrega assignedUsersDisplay
     let resultado = await getAllTasks();
 
-    // Si llegó el parámetro status, conservar solo las tareas con ese estado exacto
     if (status) resultado = resultado.filter(t => t.status === status);
-    // Si llegó userId, conservar solo las tareas donde ese id está en assignedUsers
-    // Number(userId) convierte el string del query param al número del arreglo
+    // includes verifica si el userId esta en el arreglo assignedUsers de cada tarea
     if (userId) resultado = resultado.filter(t => t.assignedUsers.includes(Number(userId)));
 
     return resultado;
 }
 
-// getTasksByUserId — retorna todas las tareas asignadas a un usuario específico
+// ── getTasksByUserId ──────────────────────────────────────────────────────────
+// Retorna todas las tareas asignadas a un usuario especifico via JOIN con task_users
 // Se usa en GET /api/users/:userId/tasks
-// Usa getAllTasks (que ya resuelve nombres) y luego filtra por userId
 export async function getTasksByUserId(userId) {
-    const todas = await getAllTasks();
-    // includes verifica si el userId está en el arreglo assignedUsers de cada tarea
-    return todas.filter(t => t.assignedUsers.includes(Number(userId)));
+    const rows = await _selectTareasConUsuarios(
+        'WHERE tu.user_id = ?',
+        [Number(userId)]
+    );
+    return rows.map(formatearTarea);
 }
 
-// updateTaskStatus — cambia el estado de una tarea y opcionalmente guarda un comentario
-// Se usa en PATCH /api/tasks/:id/status — accesible por todos los roles autenticados
-// Llama a updateTask internamente para reutilizar la lógica de persistencia
+// ── updateTaskStatus ──────────────────────────────────────────────────────────
+// Cambia el estado de una tarea y opcionalmente guarda un comentario del estudiante
+// Se usa en PATCH /api/tasks/:id/status  accesible por todos los roles autenticados
 export async function updateTaskStatus(id, status, comment) {
-    // Construimos el objeto de actualización con status siempre presente
     const campos = { status };
-    // Solo incluimos comment si el controlador lo recibió — undefined lo excluye del UPDATE
     if (comment !== undefined) campos.comment = comment;
     return updateTask(id, campos);
 }
 
-// assignUsersToTask — agrega usuarios al arreglo assignedUsers de una tarea
-// Usa Set para eliminar automáticamente los IDs duplicados
+// ── assignUsersToTask ─────────────────────────────────────────────────────────
+// Agrega usuarios al pivote task_users sin eliminar los que ya estan asignados
+// Usa Set internamente para no duplicar usuarios ya existentes
 // Se usa en POST /api/tasks/:taskId/assign
 export async function assignUsersToTask(taskId, userIds) {
-    // Verificar que la tarea existe antes de modificarla
     const tarea = await getTaskById(taskId);
     if (!tarea) return null;
 
-    // Combinar los usuarios existentes con los nuevos y eliminar duplicados con Set
-    // [...new Set([...arregloA, ...arregloB])] es el patrón estándar para unión sin duplicados
-    const nuevosUsuarios = [...new Set([...tarea.assignedUsers, ...userIds.map(Number)])];
+    // Combinamos los usuarios existentes con los nuevos sin duplicar
+    const existentes = tarea.assignedUsers;
+    const nuevos     = userIds.map(Number).filter(id => !existentes.includes(id));
 
-    // Actualizar la tarea con el arreglo combinado
-    return updateTask(taskId, { assignedUsers: nuevosUsuarios });
+    if (nuevos.length > 0) {
+        await _asignarUsuariosEnPivot(Number(taskId), nuevos);
+    }
+
+    return getTaskById(taskId);
 }
 
-// removeUserFromTask — quita un usuario específico de la lista assignedUsers
+// ── removeUserFromTask ────────────────────────────────────────────────────────
+// Quita un usuario especifico de la tabla task_users para una tarea especifica
 // Se usa en DELETE /api/tasks/:taskId/users/:userId
 export async function removeUserFromTask(taskId, userId) {
-    // Verificar que la tarea existe antes de modificarla
     const tarea = await getTaskById(taskId);
     if (!tarea) return null;
 
-    // filter retorna todos los ids EXCEPTO el userId que se quiere quitar
-    // Number(userId) convierte el string del parámetro de ruta al número del arreglo
-    const filtrados = tarea.assignedUsers.filter(id => id !== Number(userId));
-
-    // Actualizar la tarea con el arreglo sin el usuario eliminado
-    return updateTask(taskId, { assignedUsers: filtrados });
-}
-// registrarNombreUsuarioEliminado — guarda el nombre de un usuario en deleted_user_names
-// de TODAS las tareas que lo tienen asignado, antes de eliminarlo permanentemente.
-// Se llama desde forceDeleteUser en users.controller.js justo antes del DELETE.
-//
-// Parámetro: userId — id del usuario que se va a eliminar
-// Parámetro: userName — nombre del usuario a preservar
-// Retorna: número de tareas actualizadas
-export async function registrarNombreUsuarioEliminado(userId, userName) {
-    // Buscar todas las tareas que tienen este userId en su assigned_users JSON
-    const [rows] = await pool.query(
-        `SELECT id, deleted_user_names FROM tasks
-         WHERE JSON_CONTAINS(assigned_users, CAST(? AS JSON), '$')`,
-        [Number(userId)]
+    await pool.query(
+        'DELETE FROM task_users WHERE task_id = ? AND user_id = ?',
+        [Number(taskId), Number(userId)]
     );
 
-    // Si no hay tareas con este userId asignado, no hay nada que actualizar — retornamos 0
-    if (rows.length === 0) return 0;
+    return getTaskById(taskId);
+}
 
-    // Para cada tarea que tiene este userId asignado, guardamos su nombre en deleted_user_names
-    for (const fila of rows) {
-        // Empezamos con un mapa vacío — lo llenamos con los datos existentes si los hay
-        let mapa = {};
-        try {
-            // Si la tarea ya tenía nombres guardados de usuarios eliminados anteriores, los leemos
-            if (fila.deleted_user_names) {
-                // mysql2 puede devolver el campo JSON ya como objeto o como string según la versión
-                mapa = typeof fila.deleted_user_names === 'object'
-                    ? fila.deleted_user_names
-                    : JSON.parse(fila.deleted_user_names);
-            }
-        // Si el JSON está malformado, empezamos con el mapa vacío sin crashear
-        } catch { mapa = {}; }
+// ── FUNCION PRIVADA: _asignarUsuariosEnPivot ──────────────────────────────────
+// Inserta filas en task_users para los userId dados, capturando el nombre como snapshot
+// Si user_id no existe en la BD, no se inserta (INSERT IGNORE por FK)
+// Consulta el nombre actual del usuario para guardarlo como snapshot de historial
+async function _asignarUsuariosEnPivot(taskId, userIds) {
+    if (!userIds || userIds.length === 0) return;
 
-        // Agregamos la entrada nueva { "userId": "nombre" } al mapa existente
-        // String(userId) garantiza que la clave sea siempre un string para consistencia
-        mapa[String(userId)] = userName;
+    // Obtenemos los nombres actuales de los usuarios para el snapshot
+    const [usuarios] = await pool.query(
+        'SELECT id, name FROM users WHERE id IN (?)',
+        [userIds]
+    );
 
-        // Guardamos el mapa actualizado en la BD como JSON string en la columna deleted_user_names
+    // Construimos las filas a insertar solo para los usuarios que existen en la BD
+    const filas = usuarios.map(u => [taskId, u.id, u.name]);
+    if (filas.length === 0) return;
+
+    // INSERT IGNORE evita error si la combinacion (task_id, user_id) ya existe
+    await pool.query(
+        'INSERT IGNORE INTO task_users (task_id, user_id, user_name_snapshot) VALUES ?',
+        [filas]
+    );
+}
+
+// ── FUNCION PRIVADA: _sincronizarAsignaciones ─────────────────────────────────
+// Reemplaza completamente las asignaciones de una tarea en task_users
+// Primero elimina todas las filas existentes y luego inserta las nuevas
+// Se usa cuando el admin edita la tarea con una lista completa de usuarios
+async function _sincronizarAsignaciones(taskId, userIds) {
+    // Eliminamos todas las asignaciones actuales de esta tarea
+    await pool.query('DELETE FROM task_users WHERE task_id = ?', [Number(taskId)]);
+
+    // Si el nuevo arreglo tiene usuarios, los insertamos con sus snapshots
+    if (userIds && userIds.length > 0) {
+        await _asignarUsuariosEnPivot(Number(taskId), userIds.map(Number));
+    }
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  NOTIFICACIONES DE CAMBIO DE ESTADO (task_state_notifications)║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── crearNotificacionEstado ───────────────────────────────────────────────────
+// Registra que un instructor cambio el estado de una tarea sin calificarla
+// (accion "reiniciar calificacion"  resetGrade: true en el PUT de la tarea).
+// Crea un registro en task_state_notifications y uno por cada estudiante asignado
+// en task_state_notification_recipients para que aparezca en el panel del estudiante.
+//
+// Parametros:
+//   taskId         id de la tarea cuyo estado fue modificado
+//   instructorId   id del instructor que realizo el cambio
+//   justificacion  texto explicativo del cambio (requerido por la UI, minimo 10 chars)
+// Retorna: el id del registro creado en task_state_notifications
+export async function crearNotificacionEstado(taskId, instructorId, justificacion) {
+    // Insertamos la notificacion principal con la justificacion del instructor
+    const [result] = await pool.query(
+        `INSERT INTO task_state_notifications (task_id, instructor_id, justificacion)
+         VALUES (?, ?, ?)`,
+        [Number(taskId), Number(instructorId), justificacion]
+    );
+    const notifId = result.insertId;
+
+    // Obtenemos todos los usuarios actualmente asignados a esta tarea en task_users
+    // Solo los que tienen user_id NOT NULL (usuarios no eliminados forzosamente)
+    const [usuarios] = await pool.query(
+        'SELECT user_id FROM task_users WHERE task_id = ? AND user_id IS NOT NULL',
+        [Number(taskId)]
+    );
+
+    // Insertamos un registro de destinatario por cada estudiante asignado a la tarea
+    // Si no hay usuarios asignados, no hay destinatarios (la notificacion existe igual)
+    if (usuarios.length > 0) {
+        // Construimos el arreglo de filas [notifId, user_id] para el INSERT multiple
+        const filas = usuarios.map(u => [notifId, u.user_id]);
+        // INSERT IGNORE evita error si alguna combinacion (notification_id, user_id) ya existe
         await pool.query(
-            'UPDATE tasks SET deleted_user_names = ? WHERE id = ?',
-            [JSON.stringify(mapa), fila.id]
+            `INSERT IGNORE INTO task_state_notification_recipients
+             (notification_id, user_id) VALUES ?`,
+            [filas]
         );
     }
 
-    // Retornamos el número de tareas actualizadas — el controlador lo usa para logging
-    return rows.length;
+    return notifId;
+}
+
+// ── getNotificacionesEstadoMine ───────────────────────────────────────────────
+// Retorna las notificaciones de cambio de estado destinadas al usuario autenticado
+// Incluye: titulo de la tarea, nombre del instructor, justificacion y si fue leida
+// Se usa en GET /api/tasks/notifications/mine  accesible por el estudiante
+//
+// Parametro: userId  id del usuario autenticado (del JWT)
+export async function getNotificacionesEstadoMine(userId) {
+    // JOIN para obtener datos de la tarea y del instructor desde las tablas relacionadas
+    // tsnr.leida: 0=no leida (badge rojo en el panel), 1=leida (sin badge)
+    const [rows] = await pool.query(
+        `SELECT
+            tsn.id,
+            tsn.task_id,
+            tsn.justificacion,
+            tsn.created_at,
+            tsnr.leida,
+            t.title  AS task_title,
+            u.name   AS instructor_name
+         FROM task_state_notification_recipients tsnr
+         JOIN task_state_notifications tsn ON tsn.id = tsnr.notification_id
+         JOIN tasks t ON t.id = tsn.task_id
+         JOIN users u ON u.id = tsn.instructor_id
+         WHERE tsnr.user_id = ?
+         ORDER BY tsn.created_at DESC`,
+        [Number(userId)]
+    );
+    return rows;
+}
+
+// ── marcarNotificacionEstadoLeida ─────────────────────────────────────────────
+// Marca una notificacion de cambio de estado como leida para un usuario especifico
+// Solo actualiza la fila en task_state_notification_recipients del usuario dado
+// Idempotente: si ya estaba leida, el UPDATE no cambia nada
+//
+// Parametros:
+//   notificacionId  id del registro en task_state_notifications
+//   userId          id del estudiante que marco como leida (del JWT)
+export async function marcarNotificacionEstadoLeida(notificacionId, userId) {
+    // UPDATE solo la fila del recipient correspondiente a este usuario
+    await pool.query(
+        `UPDATE task_state_notification_recipients
+         SET leida = 1
+         WHERE notification_id = ? AND user_id = ?`,
+        [Number(notificacionId), Number(userId)]
+    );
 }

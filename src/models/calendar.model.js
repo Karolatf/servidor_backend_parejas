@@ -1,7 +1,7 @@
-// MÓDULO: models/calendar.model.js
+// MODULO: models/calendar.model.js
 // CAPA: Modelo (datos y operaciones sobre la tabla calendar_events en MySQL)
 //
-// Responsabilidad única: interactuar con la tabla calendar_events.
+// Responsabilidad unica: interactuar con la tabla calendar_events.
 // NUNCA conoce req, res ni Express.
 //
 // Endpoints que usa este modelo:
@@ -15,52 +15,52 @@
 import pool from '../database/db.connection.js';
 
 // ── formatearEvento ───────────────────────────────────────────────────────────
-// Función privada que convierte una fila raw de MySQL al objeto camelCase del frontend
-// MySQL usa snake_case (instructor_id, student_id, task_id) — el frontend espera camelCase
-// Parámetro: fila — objeto raw devuelto por pool.query (nombres con underscore)
+// Funcion privada que convierte una fila raw de MySQL al objeto camelCase del frontend
+// MySQL usa snake_case (instructor_id, student_id, task_id)  el frontend espera camelCase
+// Parametro: fila  objeto raw devuelto por pool.query (nombres con underscore)
 // Retorna: objeto con nombres camelCase listo para enviar como JSON al frontend
 function formatearEvento(fila) {
-    // Si la fila es null o undefined, retornamos null — el controlador maneja ese caso
+    // Si la fila es null o undefined, retornamos null  el controlador maneja ese caso
     if (!fila) return null;
     return {
         id:           fila.id,
-        // instructorId: id del instructor que creó el evento — viene de la columna instructor_id
+        // instructorId: id del instructor que creo el evento  viene de la columna instructor_id
         instructorId: fila.instructor_id,
-        // studentId: id del estudiante asignado al evento — null si es un evento propio del instructor
+        // studentId: id del estudiante asignado al evento  null si es un evento propio del instructor
         studentId:    fila.student_id    || null,
-        // taskId: id de la tarea relacionada con el evento — null si no hay tarea vinculada
+        // taskId: id de la tarea relacionada con el evento  null si no hay tarea vinculada
         taskId:       fila.task_id       || null,
-        // date: MySQL puede retornar la fecha como objeto Date o como string dependiendo de la versión
+        // date: MySQL puede retornar la fecha como objeto Date o como string dependiendo de la version
         // toISOString().split('T')[0] extrae solo la parte YYYY-MM-DD sin la hora
         date:         fila.date instanceof Date
                           ? fila.date.toISOString().split('T')[0]
                           : fila.date,
         title:        fila.title,
-        // color: color del evento en el calendario (hexadecimal) — viene de la columna color
+        // color: color del evento en el calendario (hexadecimal)  viene de la columna color
         color:        fila.color,
         // tipo: distingue entre 'asignado' (para estudiante) y 'propio' (del instructor)
         tipo:         fila.tipo,
         // studentName: nombre del estudiante obtenido via JOIN con la tabla users
-        // null si el evento no está asignado a ningún estudiante
+        // null si el evento no esta asignado a ningun estudiante
         studentName:  fila.student_name  || null,
-        // taskTitle: título de la tarea obtenido via JOIN con la tabla tasks
-        // null si el evento no está relacionado con ninguna tarea
+        // taskTitle: titulo de la tarea obtenido via JOIN con la tabla tasks
+        // null si el evento no esta relacionado con ninguna tarea
         taskTitle:    fila.task_title    || null,
-        // taskStatus: estado actual de la tarea relacionada — null si no hay tarea vinculada
+        // taskStatus: estado actual de la tarea relacionada  null si no hay tarea vinculada
         taskStatus:   fila.task_status   || null,
     };
 }
 
 // ── getEventosInstructor ──────────────────────────────────────────────────────
-// Exportamos la función getEventosInstructor que retorna todos los eventos creados
-// por el instructor autenticado, ordenados cronológicamente
-// Parámetro: instructorId — id del instructor autenticado (viene de req.usuario.id)
-// Retorna: arreglo de objetos de eventos formateados, puede estar vacío si no hay eventos
+// Exportamos la funcion getEventosInstructor que retorna todos los eventos creados
+// por el instructor autenticado, ordenados cronologicamente
+// Parametro: instructorId  id del instructor autenticado (viene de req.usuario.id)
+// Retorna: arreglo de objetos de eventos formateados, puede estar vacio si no hay eventos
 export async function getEventosInstructor(instructorId) {
     // Construimos la query con JOINs para obtener datos adicionales del estudiante y la tarea
-    // LEFT JOIN users garantiza que los eventos sin estudiante asignado también aparezcan
-    // LEFT JOIN tasks garantiza que los eventos sin tarea vinculada también aparezcan
-    // ORDER BY date ASC, id ASC ordena por fecha y luego por orden de creación dentro del mismo día
+    // LEFT JOIN users garantiza que los eventos sin estudiante asignado tambien aparezcan
+    // LEFT JOIN tasks garantiza que los eventos sin tarea vinculada tambien aparezcan
+    // ORDER BY date ASC, id ASC ordena por fecha y luego por orden de creacion dentro del mismo dia
     const sql = `
         SELECT
             ce.id,
@@ -87,10 +87,10 @@ export async function getEventosInstructor(instructorId) {
 }
 
 // ── getEventosUsuario ─────────────────────────────────────────────────────────
-// Exportamos la función getEventosUsuario que retorna todos los eventos visibles
+// Exportamos la funcion getEventosUsuario que retorna todos los eventos visibles
 // para el estudiante autenticado: los asignados por el instructor y los propios
-// Parámetro: studentId — id del estudiante autenticado (viene de req.usuario.id)
-// Retorna: arreglo de objetos de eventos formateados, puede estar vacío
+// Parametro: studentId  id del estudiante autenticado (viene de req.usuario.id)
+// Retorna: arreglo de objetos de eventos formateados, puede estar vacio
 export async function getEventosUsuario(studentId) {
     // La query retorna dos tipos de eventos combinados con OR:
     //   1. Eventos donde student_id = studentId (asignados al estudiante por el instructor)
@@ -123,11 +123,11 @@ export async function getEventosUsuario(studentId) {
 }
 
 // ── createEvento ──────────────────────────────────────────────────────────────
-// Exportamos la función createEvento que inserta un evento nuevo en calendar_events
-// Parámetro: datos — objeto con los campos del evento enviados desde el controlador
-// Retorna: el objeto del evento recién creado con los datos del JOIN incluidos
+// Exportamos la funcion createEvento que inserta un evento nuevo en calendar_events
+// Parametro: datos  objeto con los campos del evento enviados desde el controlador
+// Retorna: el objeto del evento recien creado con los datos del JOIN incluidos
 export async function createEvento(datos) {
-    // Desestructuramos los campos del objeto datos que llegó del controlador
+    // Desestructuramos los campos del objeto datos que llego del controlador
     const { instructorId, studentId, taskId, date, title, color, tipo } = datos;
 
     // Construimos el INSERT con los siete campos de la tabla calendar_events
@@ -136,8 +136,8 @@ export async function createEvento(datos) {
             (instructor_id, student_id, task_id, date, title, color, tipo)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    // Ejecutamos el INSERT — studentId y taskId usan || null para guardar NULL si no vienen
-    // color tiene '#3b82f6' (azul) como color por defecto si el frontend no lo envía
+    // Ejecutamos el INSERT  studentId y taskId usan || null para guardar NULL si no vienen
+    // color tiene '#3b82f6' (azul) como color por defecto si el frontend no lo envia
     // tipo tiene 'propio' como tipo por defecto si el frontend no lo especifica
     const [result] = await pool.query(sql, [
         instructorId,
@@ -149,7 +149,7 @@ export async function createEvento(datos) {
         tipo      || 'propio',
     ]);
 
-    // Buscamos el evento recién creado con JOIN para incluir los nombres del estudiante y la tarea
+    // Buscamos el evento recien creado con JOIN para incluir los nombres del estudiante y la tarea
     // Necesitamos hacer una query separada porque el INSERT no retorna los datos del JOIN
     const [rows] = await pool.query(
         `SELECT ce.*, u.name AS student_name, t.title AS task_title, t.status AS task_status
@@ -164,20 +164,20 @@ export async function createEvento(datos) {
 }
 
 // ── deleteEvento ──────────────────────────────────────────────────────────────
-// Exportamos la función deleteEvento que elimina un evento de calendar_events
-// La cláusula AND instructor_id = ? garantiza que solo el creador del evento pueda borrarlo
-// Parámetro: id     — id del evento a eliminar (viene de req.params.id en el controlador)
-// Parámetro: userId — id del usuario autenticado (viene de req.usuario.id en el controlador)
-// Retorna: true si se eliminó el evento, false si no existía o no pertenecía al usuario
+// Exportamos la funcion deleteEvento que elimina un evento de calendar_events
+// La clausula AND instructor_id = ? garantiza que solo el creador del evento pueda borrarlo
+// Parametro: id      id del evento a eliminar (viene de req.params.id en el controlador)
+// Parametro: userId  id del usuario autenticado (viene de req.usuario.id en el controlador)
+// Retorna: true si se elimino el evento, false si no existia o no pertenecia al usuario
 export async function deleteEvento(id, userId) {
-    // DELETE con doble condición — solo elimina si el id coincide Y el instructor_id también
-    // Si el usuario no es el creador del evento, affectedRows será 0 y retornamos false
+    // DELETE con doble condicion  solo elimina si el id coincide Y el instructor_id tambien
+    // Si el usuario no es el creador del evento, affectedRows sera 0 y retornamos false
     const sql = `
         DELETE FROM calendar_events
         WHERE id = ? AND instructor_id = ?
     `;
-    // Ejecutamos el DELETE pasando el id del evento y el id del usuario como parámetros seguros
+    // Ejecutamos el DELETE pasando el id del evento y el id del usuario como parametros seguros
     const [result] = await pool.query(sql, [id, userId]);
-    // affectedRows > 0 significa que se encontró y eliminó el evento — retornamos true
+    // affectedRows > 0 significa que se encontro y elimino el evento  retornamos true
     return result.affectedRows > 0;
 }

@@ -102,11 +102,25 @@
 
 **Respuesta:**
 
-> "RBAC es Role-Based Access Control — control de acceso basado en roles. En la BD tenemos 4 tablas: `roles` (admin, instructor, user), `permissions` (tasks.create, users.delete, etc.), `role_permissions` (qué permisos tiene cada rol) y `user_roles` (qué rol tiene cada usuario).
+> "RBAC es Role-Based Access Control — control de acceso basado en roles. El sistema tiene 6 roles: 3 base (admin, instructor, user) que tienen su propia vista SPA, y 3 adicionales (auditor, comunicador, soporte) que amplían el rol base con permisos y secciones extra.
 >
-> La función `getUserRolesAndPermissions(userId)` en `user.model.js` hace un JOIN de esas 4 tablas y retorna un arreglo como `[{ name: 'admin', permissions: ['tasks.create', 'users.delete', ...] }]`. El middleware `checkPermission('tasks.create')` verifica si el usuario autenticado tiene ese permiso antes de continuar."
+> Las tablas del RBAC son: `roles` (los 6 roles), `permissions` (permisos atómicos con formato `recurso.accion`), `role_permissions` (qué permisos tiene cada rol — tabla pivote N:M), `user_roles` (qué roles tiene cada usuario — primario + adicionales), y `user_extra_permissions` (permisos específicos del rol adicional elegidos por el admin para ese usuario).
+>
+> Al hacer login, el backend combina los permisos nativos del rol primario (`role_permissions`) con los permisos extra del usuario (`user_extra_permissions`) y los incluye todos en el JWT. El frontend los usa para adaptar la interfaz sin consultar la BD en cada clic."
 
-**Mostrar:** `src/models/user.model.js` función `getUserRolesAndPermissions`, y el JOIN SQL.
+**Mostrar:** `src/models/user.model.js` — la función que obtiene permisos y construye el JWT payload.
+
+---
+
+### ¿Qué es un rol adicional y cómo lo asigna el admin?
+
+**Respuesta:**
+
+> "Un rol adicional amplía los permisos de un usuario sin cambiar su vista SPA. Por ejemplo, un usuario con rol primario `admin` puede recibir el rol adicional `auditor`. Cuando el admin lo gestiona desde el panel, selecciona el rol adicional y elige exactamente cuáles de sus permisos otorgar — no necesariamente todos.
+>
+> Los permisos seleccionados se guardan en `user_extra_permissions` con `rol_origen_id` (de qué rol vienen) y `permission_id` (cuál permiso específico). Al próximo login del usuario, el JWT incluye esos permisos extra. El frontend los detecta con `calcularPermisosExtras()` y muestra las secciones correspondientes en el sidebar — con la barra de color del rol de origen para que sea visualmente distinto."
+
+**Mostrar:** `database/schema.sql` — tabla `user_extra_permissions` con sus FK y comentarios.
 
 ---
 
@@ -130,11 +144,11 @@
 
 **Respuesta:**
 
-> "La columna `assigned_users` en la tabla `tasks` es de tipo `JSON` — guarda un arreglo de IDs como `[1, 2, 5]`. Esto permite asignar una tarea a N usuarios sin necesitar una tabla de unión separada.
+> "Usamos la tabla pivote `task_users`. Al crear o editar una tarea con usuarios asignados, el modelo hace INSERT en `task_users` con una fila por cada estudiante: `{ task_id, user_id, user_name_snapshot }`. El snapshot guarda el nombre en ese momento para preservar el historial.
 >
-> Cuando se asignan usuarios con `POST /api/tasks/:taskId/assign`, el modelo `assignUsersToTask(taskId, userIds)` obtiene los usuarios actuales de la tarea, los combina con los nuevos usando `[...new Set([...actuales, ...nuevos.map(Number)])]` — el `Set` elimina duplicados automáticamente — y actualiza la columna con el arreglo combinado serializado como JSON. Para filtrar tareas de un usuario, el modelo usa `JSON_CONTAINS(assigned_users, CAST(userId AS JSON), '$')` en MySQL."
+> Para filtrar las tareas de un estudiante: `SELECT t.* FROM tasks t JOIN task_users tu ON tu.task_id = t.id WHERE tu.user_id = 3` — un JOIN simple y eficiente. Para reasignar, el modelo primero borra las filas antiguas de `task_users` para esa tarea y luego inserta las nuevas."
 
-**Mostrar:** `src/models/task.model.js` funciones `assignUsersToTask` y `createTask` (la parte de `serializarUsuarios`).
+**Mostrar:** `src/models/task.model.js` función `createTask` y la inserción en `task_users`.
 
 ---
 
@@ -154,11 +168,13 @@
 
 **Respuesta:**
 
-> "El backend preserva el historial. Cuando se elimina un usuario, antes de borrarlo se llama a `registrarNombreUsuarioEliminado(userId, userName)` que busca todas las tareas que tienen ese userId en `assigned_users` y guarda el nombre en la columna `deleted_user_names` (un mapa JSON `{ '7': 'Ana López' }`). Así, cuando el frontend muestra las tareas, puede mostrar `'Ana López (eliminada)'` en lugar de un ID sin nombre.
+> "El sistema preserva el historial de dos maneras según el tipo de eliminación.
 >
-> Después de enviar la respuesta al cliente, `setImmediate()` ejecuta en background la actualización de `assigned_users` para remover el ID del usuario eliminado. Usamos `setImmediate` para no hacer esperar al cliente — la respuesta ya fue enviada y la limpieza ocurre en el fondo."
+> **Soft delete (estándar):** el usuario queda en la BD con `deleted_at = NOW()`. Los registros en `task_users` y `task_comments` que referencian ese `user_id` siguen intactos — el usuario existe, solo está marcado como eliminado. Puede recuperarse dentro de 30 días.
+>
+> **Force delete (forzoso):** `DELETE FROM users`. Las foreign keys de `task_users.user_id` y `task_comments.user_id` tienen `ON DELETE SET NULL` — la FK queda NULL pero el campo `user_name_snapshot` (nombre del usuario guardado al momento de la asignación) se preserva. El frontend puede mostrar ese nombre aunque la cuenta ya no exista."
 
-**Mostrar:** `src/models/task.model.js` función `registrarNombreUsuarioEliminado`, y `src/controller/users.controller.js` el bloque de `setImmediate`.
+**Mostrar:** `database/schema.sql` — las FK de `task_users` y `task_comments` con `ON DELETE SET NULL`.
 
 ---
 
@@ -222,11 +238,13 @@
 
 ---
 
-### ¿Por qué guardan los usuarios asignados como JSON en la tabla tasks y no con una tabla aparte?
+### ¿Por qué antes guardaban los usuarios asignados como JSON y ahora usan una tabla pivote?
 
 **Respuesta:**
 
-> "Con una tabla de unión `task_users` (patrón tradicional Many-to-Many), cada asignación sería una fila: `{ task_id: 1, user_id: 2 }`, `{ task_id: 1, user_id: 5 }`, etc. Para este proyecto, usar una columna `assigned_users` de tipo JSON con un arreglo de IDs simplifica las queries y el código. MySQL soporta el tipo JSON nativamente y tiene funciones como `JSON_CONTAINS()` para buscar dentro del arreglo. La desventaja es que no hay foreign key constraint — el backend tiene que verificar en código que los IDs existan."
+> "Al inicio, la tabla `tasks` tenía una columna `assigned_users` de tipo JSON con un arreglo de IDs como `[2, 5, 8]`. Eso violaba la Primera Forma Normal — una columna no puede tener múltiples valores. Además, no podíamos crear foreign keys reales ni hacer JOINs eficientes.
+>
+> La reestructuración introdujo la tabla pivote `task_users` con una fila por cada combinación tarea-estudiante: `{ task_id: 1, user_id: 2, user_name_snapshot: 'Juan', assigned_at: ... }`. Ahora podemos hacer JOINs reales: `SELECT ... FROM tasks t JOIN task_users tu ON tu.task_id = t.id WHERE tu.user_id = 3`. El campo `user_name_snapshot` preserva el nombre del estudiante aunque la cuenta sea eliminada — el historial nunca se pierde."
 
 ---
 

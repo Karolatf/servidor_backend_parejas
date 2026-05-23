@@ -1,7 +1,7 @@
-// MÓDULO: models/notes.model.js
-// CAPA: Modelo — operaciones sobre la tabla user_notes en MySQL
+// MODULO: models/notes.model.js
+// CAPA: Modelo  operaciones sobre la tabla user_notes en MySQL
 //
-// Responsabilidad única: interactuar con la tabla user_notes.
+// Responsabilidad unica: interactuar con la tabla user_notes.
 // NUNCA conoce req, res ni Express.
 //
 // Endpoints que usa este modelo:
@@ -14,36 +14,36 @@
 import pool from '../database/db.connection.js';
 
 // ── getNotas ──────────────────────────────────────────────────────────────────
-// Exportamos la función getNotas que retorna todas las notas del usuario autenticado
-// ordenadas cronológicamente de la más antigua a la más reciente
-// Parámetro: userId — id del usuario autenticado (viene de req.usuario.id en el controlador)
+// Exportamos la funcion getNotas que retorna todas las notas del usuario autenticado
+// ordenadas cronologicamente de la mas antigua a la mas reciente
+// Parametro: userId  id del usuario autenticado (viene de req.usuario.id en el controlador)
 export async function getNotas(userId) {
     // Ejecutamos la query que obtiene solo los campos que el frontend necesita mostrar
-    // WHERE user_id = ? filtra únicamente las notas que pertenecen a este usuario
-    // ORDER BY created_at ASC retorna las notas del más antiguo al más reciente
+    // WHERE user_id = ? filtra unicamente las notas que pertenecen a este usuario
+    // ORDER BY created_at ASC retorna las notas del mas antiguo al mas reciente
     const [rows] = await pool.query(
         'SELECT id, texto, color, created_at FROM user_notes WHERE user_id = ? ORDER BY created_at ASC',
         [userId]
     );
     // Convertimos cada fila de MySQL al objeto limpio que espera el frontend
-    // Solo exponemos id, texto y color — omitimos user_id y created_at del objeto final
+    // Solo exponemos id, texto y color  omitimos user_id y created_at del objeto final
     return rows.map(r => ({ id: r.id, texto: r.texto, color: r.color }));
 }
 
 // ── createNota ────────────────────────────────────────────────────────────────
-// Exportamos la función createNota que inserta una nota nueva del usuario en la tabla user_notes
-// Parámetro: userId — id del usuario autenticado que crea la nota
-// Parámetro: texto  — contenido de la nota enviado desde el formulario del frontend
-// Parámetro: color  — color del fondo de la nota (valor hexadecimal)
-// Retorna: el objeto de la nota recién creada, o null si la inserción falló
+// Exportamos la funcion createNota que inserta una nota nueva del usuario en la tabla user_notes
+// Parametro: userId  id del usuario autenticado que crea la nota
+// Parametro: texto   contenido de la nota enviado desde el formulario del frontend
+// Parametro: color   color del fondo de la nota (valor hexadecimal)
+// Retorna: el objeto de la nota recien creada, o null si la insercion fallo
 export async function createNota(userId, texto, color) {
-    // Insertamos la nota en la BD — color tiene '#fef3c7' (amarillo pastel) como valor por defecto
-    // El ? de color || '#fef3c7' garantiza que siempre haya un color aunque el frontend no lo envíe
+    // Insertamos la nota en la BD  color tiene '#fef3c7' (amarillo pastel) como valor por defecto
+    // El ? de color || '#fef3c7' garantiza que siempre haya un color aunque el frontend no lo envie
     const [result] = await pool.query(
         'INSERT INTO user_notes (user_id, texto, color) VALUES (?, ?, ?)',
         [userId, texto, color || '#fef3c7']
     );
-    // Buscamos la nota recién creada usando el id AUTO_INCREMENT que MySQL asignó
+    // Buscamos la nota recien creada usando el id AUTO_INCREMENT que MySQL asigno
     // para retornar el objeto completo y confirmado desde la BD
     const [rows] = await pool.query(
         'SELECT id, texto, color FROM user_notes WHERE id = ?',
@@ -55,18 +55,18 @@ export async function createNota(userId, texto, color) {
 }
 
 // ── deleteNota ────────────────────────────────────────────────────────────────
-// Exportamos la función deleteNota que elimina una nota de la tabla user_notes
-// La cláusula AND user_id = ? garantiza que un usuario no pueda borrar notas de otro
-// Parámetro: id     — id de la nota a eliminar (viene de req.params.id en el controlador)
-// Parámetro: userId — id del usuario autenticado (viene de req.usuario.id en el controlador)
-// Retorna: true si la nota existía y pertenecía al usuario, false si no se encontró nada
+// Exportamos la funcion deleteNota que elimina una nota de la tabla user_notes
+// La clausula AND user_id = ? garantiza que un usuario no pueda borrar notas de otro
+// Parametro: id      id de la nota a eliminar (viene de req.params.id en el controlador)
+// Parametro: userId  id del usuario autenticado (viene de req.usuario.id en el controlador)
+// Retorna: true si la nota existia y pertenecia al usuario, false si no se encontro nada
 export async function deleteNota(id, userId) {
-    // DELETE con doble condición — solo elimina si el id coincide Y el user_id también coincide
+    // DELETE con doble condicion  solo elimina si el id coincide Y el user_id tambien coincide
     // affectedRows es 0 si la nota no existe o no pertenece al usuario autenticado
     const [result] = await pool.query(
         'DELETE FROM user_notes WHERE id = ? AND user_id = ?',
         [id, userId]
     );
-    // Retornamos true si se eliminó al menos una fila, false si no se encontró nada
+    // Retornamos true si se elimino al menos una fila, false si no se encontro nada
     return result.affectedRows > 0;
 }

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c14e7c03-03bd-4be3-ac47-16146887d332",
     "name": "SISTEMA GESTIÓN DE TAREAS — v2",
-    "description": "Colección actualizada — Autenticación, RBAC, Recuperación de contraseña, Usuarios, Tareas, Calendario de Eventos, Notas Personales.\n\nNuevos grupos en esta versión:\n• CALENDARIO — 6 endpoints (GET instructor, GET usuario, POST propio, POST estudiante, POST con tarea, DELETE)\n• NOTAS — 4 endpoints (GET, POST, POST sin color, DELETE)\n\nEndpoints actualizados:\n• USUARIOS: Eliminar Forzoso, Desactivar con motivo, Reactivar\n• TAREAS: calificación con grade + gradeReason, estado reprobada, dashboard, filter",
+    "description": "Colección completa — Autenticación, Recuperación de contraseña, Usuarios, Gestión de roles múltiples, Tareas, Comentarios de tareas, Calendario de Eventos, Notas Personales, RBAC.\n\nNuevos endpoints en esta versión (v3):\n• USUARIOS: Soft delete recuperable (30 días), Restaurar usuario, Listar eliminados\n• GESTIÓN DE ROLES MÚLTIPLES: Roles disponibles, Listar roles de usuario, Agregar rol, Quitar rol\n• COMENTARIOS DE TAREA: Ver, Agregar y Eliminar comentarios (solo en tareas calificadas)\n\nEndpoints actualizados:\n• USUARIOS: CAMBIAR CONTRASEÑA requiere mínimo 8 caracteres\n• USUARIOS: ELIMINAR y FORZOSO ahora preservan historial vía task_users (ON DELETE SET NULL)\n• TAREAS: assignedUsers ahora usa tabla pivote task_users (normalizado)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52923475"
   },
@@ -362,16 +362,17 @@
                 "type": "text"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"El usuario finalizó el programa y solicitó eliminación de cuenta\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
             "url": {
               "raw": "{{URL_API}}/users/6",
-              "host": [
-                "{{URL_API}}"
-              ],
-              "path": [
-                "users",
-                "6"
-              ]
-            }
+              "host": [ "{{URL_API}}" ],
+              "path": [ "users", "6" ]
+            },
+            "description": "Eliminación estándar — solo si el usuario no tiene tareas pendientes o en_progreso.\nRequiere body.reason ≥ 10 caracteres para auditoría.\n\n400 si tiene tareas activas → usar SOFT DELETE o FORZOSO.\n404 si el usuario no existe."
           },
           "response": []
         },
@@ -466,7 +467,7 @@
                 "password"
               ]
             },
-            "description": "Cambia la contraseña del usuario logueado.\n\nReglas:\n- Solo el usuario dueño del token puede cambiar su propia contraseña (el id del path debe coincidir con el id del token).\n- `currentPassword` debe ser la contraseña actual correcta.\n- `newPassword` mínimo 6 caracteres.\n\nRespuesta 400 si la contraseña actual es incorrecta.\nRespuesta 403 si el id del path no coincide con el usuario del token."
+            "description": "Cambia la contraseña del usuario logueado.\n\nReglas:\n- Solo el usuario dueño del token puede cambiar su propia contraseña (el id del path debe coincidir con el id del token).\n- `currentPassword` debe ser la contraseña actual correcta.\n- `newPassword` mínimo 8 caracteres.\n\nRespuesta 400 si la contraseña actual es incorrecta.\nRespuesta 403 si el id del path no coincide con el usuario del token."
           },
           "response": []
         },
@@ -501,7 +502,7 @@
                 "force"
               ]
             },
-            "description": "Eliminación permanente incluso si el usuario está activo.\nRequiere body.reason ≥ 10 caracteres.\nAntes de borrar, preserva el nombre en deleted_user_names de las tareas asignadas.\n\n400 si reason está ausente o < 10 chars.\n404 si el usuario no existe."
+            "description": "Eliminación permanente incluso si el usuario está activo.\nRequiere body.reason ≥ 10 caracteres.\nLas filas en task_users quedan con user_id = NULL (ON DELETE SET NULL) — user_name_snapshot preserva el nombre en el historial.\n\n400 si reason está ausente o < 10 chars.\n404 si el usuario no existe."
           },
           "response": []
         },
@@ -571,9 +572,136 @@
                 "reactivate"
               ]
             },
-            "description": "Reactiva al usuario (is_active = 1).\nLimpia deactivation_reason y deactivation_date.\n\n400 si el usuario ya está activo."
+            "description": "Reactiva al usuario (is_active = 1).\nLimpia deactivation_reason y deactivation_date; registra reactivation_date = NOW().\n\n400 si el usuario ya está activo."
           },
           "response": []
+        },
+        {
+          "name": "SOFT DELETE USUARIO (recuperable 30 días)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"El usuario solicitó baja voluntaria del programa de formación\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{URL_API}}/users/5/soft-delete",
+              "host": [ "{{URL_API}}" ],
+              "path": [ "users", "5", "soft-delete" ]
+            },
+            "description": "Marca deleted_at con la fecha actual — el usuario desaparece de las listas pero puede recuperarse dentro de 30 días.\nEl motivo se guarda en soft_delete_reason (columna separada de deactivation_reason).\nRequiere body.reason ≥ 10 caracteres.\n\n400 si reason es insuficiente.\n404 si el usuario no existe."
+          },
+          "response": []
+        },
+        {
+          "name": "RESTAURAR USUARIO (soft delete)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/5/restore",
+              "host": [ "{{URL_API}}" ],
+              "path": [ "users", "5", "restore" ]
+            },
+            "description": "Borra deleted_at — el usuario vuelve a aparecer en las listas.\nSolo funciona si no han pasado 30 días desde el soft delete.\n\n404 si el usuario no existe, no fue eliminado o el plazo de 30 días expiró."
+          },
+          "response": []
+        },
+        {
+          "name": "LISTAR USUARIOS ELIMINADOS (soft delete)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{URL_API}}/users/deleted",
+              "host": [ "{{URL_API}}" ],
+              "path": [ "users", "deleted" ]
+            },
+            "description": "Lista todos los usuarios con deleted_at no NULL (en papelera).\nSolo el admin puede ver esta lista.\n\nIncluye la fecha de eliminación y el motivo para decidir si restaurar o dejar expirar."
+          },
+          "response": []
+        },
+        {
+          "name": "── GESTIÓN DE ROLES MÚLTIPLES ──",
+          "item": [
+            {
+              "name": "ROLES DISPONIBLES DEL SISTEMA",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{URL_API}}/users/roles/available",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "users", "roles", "available" ]
+                },
+                "description": "Devuelve todos los roles del sistema con sus metadatos (id, name, label, color, descripcion).\nSe usa en el modal 'Gestionar roles' para mostrar las opciones disponibles.\n\nSolo el admin puede acceder."
+              },
+              "response": []
+            },
+            {
+              "name": "LISTAR ROLES DE UN USUARIO",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{URL_API}}/users/2/roles",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "users", "2", "roles" ]
+                },
+                "description": "Devuelve el arreglo de slugs de roles asignados al usuario: ['admin', 'instructor'].\nIncluye el rol primario (users.role) y todos los adicionales (user_roles).\n\nSolo el admin puede acceder."
+              },
+              "response": []
+            },
+            {
+              "name": "AGREGAR ROL ADICIONAL A USUARIO",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"roleName\": \"instructor\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{URL_API}}/users/2/roles",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "users", "2", "roles" ]
+                },
+                "description": "Agrega un rol adicional al usuario en user_roles.\nNo cambia el rol primario (users.role) — solo añade permisos extra.\nRoles válidos: 'admin', 'instructor', 'user'.\n\n400 si el rol no existe o ya está asignado.\n404 si el usuario no existe."
+              },
+              "response": []
+            },
+            {
+              "name": "QUITAR ROL ADICIONAL DE USUARIO",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{URL_API}}/users/2/roles/instructor",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "users", "2", "roles", "instructor" ]
+                },
+                "description": "Quita el rol adicional 'instructor' del usuario.\nNo puede quitar el rol primario — cambiar primero con PATCH /role.\n\n400 si se intenta quitar el rol primario.\n404 si el usuario no existe."
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },
@@ -1028,6 +1156,65 @@
             "description": "Elimina al usuario con userId=2 de la lista de asignados de la tarea con id=1.\n\n404 si la tarea o el usuario no existe.\n400 si el usuario no estaba asignado a esa tarea."
           },
           "response": []
+        },
+        {
+          "name": "── COMENTARIOS DE TAREA ──",
+          "item": [
+            {
+              "name": "VER COMENTARIOS DE TAREA",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{URL_API}}/tasks/1/comments",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "tasks", "1", "comments" ]
+                },
+                "description": "Devuelve todos los comentarios de la tarea con id=1, ordenados por created_at ASC.\nCada comentario incluye: id, taskId, userId, userName, comentario, createdAt.\n\nAccesible por admin, instructor y el estudiante asignado.\n404 si la tarea no existe."
+              },
+              "response": []
+            },
+            {
+              "name": "AGREGAR COMENTARIO A TAREA CALIFICADA",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"comentario\": \"Entiendo el feedback, corregiré la documentación en la próxima entrega.\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{URL_API}}/tasks/1/comments",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "tasks", "1", "comments" ]
+                },
+                "description": "Agrega un comentario a la tarea. Solo funciona si la tarea ya tiene nota asignada (grade != null).\nPueden comentar: el estudiante asignado, el admin o el instructor.\n\n400 si la tarea no tiene nota — el estudiante aún no puede comentar.\n400 si el comentario está vacío.\n403 si el usuario no está asignado a la tarea y no es admin/instructor.\n404 si la tarea no existe."
+              },
+              "response": []
+            },
+            {
+              "name": "ELIMINAR COMENTARIO DE TAREA",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{ACCESS_TOKEN}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{URL_API}}/tasks/1/comments/1",
+                  "host": [ "{{URL_API}}" ],
+                  "path": [ "tasks", "1", "comments", "1" ]
+                },
+                "description": "Elimina el comentario con id=1 de la tarea con id=1.\nSolo puede eliminarlo el autor del comentario o un admin.\n\n403 si el usuario no es el autor ni admin.\n404 si el comentario no existe en esa tarea."
+              },
+              "response": []
+            }
+          ],
+          "description": "Comentarios de retroalimentación post-calificación.\n\nFlujo:\n1. Instructor califica la tarea (grade != null)\n2. Estudiante puede ver la nota y agregar un comentario\n3. Instructor y admin también pueden comentar para retroalimentación bidireccional\n4. Solo el autor o un admin puede eliminar un comentario"
         }
       ]
     },

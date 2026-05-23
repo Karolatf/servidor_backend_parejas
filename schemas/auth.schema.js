@@ -1,14 +1,14 @@
 // schemas/auth.schema.js
-// MÓDULO: schemas/auth.schema.js
-// CAPA: Schemas (moldes de validación de datos)
+// MODULO: schemas/auth.schema.js
+// CAPA: Schemas (moldes de validacion de datos)
 //
-// Responsabilidad única: definir las reglas que deben cumplir
+// Responsabilidad unica: definir las reglas que deben cumplir
 // las credenciales de login y registro antes de llegar al controlador.
-// Sigue el mismo patrón que user.schema.js y task.schema.js.
+// Sigue el mismo patron que user.schema.js y task.schema.js.
 //
-// CAMBIO en esta versión:
+// CAMBIO en esta version:
 //   loginSchema ahora usa 'email' en lugar de 'documento'.
-//   El instructor pidió que el login sea con email + contraseña para
+//   El instructor pidio que el login sea con email + contrasena para
 //   que sea consistente con el formulario de la pantalla de inicio.
 
 import { z } from 'zod';
@@ -19,11 +19,11 @@ import { z } from 'zod';
 // Respuesta exitosa: { accessToken, refreshToken, user }
 //
 // Antes era { documento, password }, ahora es { email, password }.
-// El cambio se hace aquí y en loginService de auth.service.js.
+// El cambio se hace aqui y en loginService de auth.service.js.
 export const loginSchema = z.object({
 
-    // email: obligatorio, formato de correo válido, máximo 100 caracteres
-    // Zod verifica automáticamente que tenga @ y un dominio después del punto
+    // email: obligatorio, formato de correo valido, maximo 100 caracteres
+    // Zod verifica automaticamente que tenga @ y un dominio despues del punto
     email: z
         .string({
             required_error:     'El correo electrónico es obligatorio',
@@ -32,8 +32,8 @@ export const loginSchema = z.object({
         .email('El correo electrónico no tiene un formato válido')
         .max(100, 'El correo no puede exceder los 100 caracteres'),
 
-    // password: obligatorio, mínimo 6 caracteres, máximo 100
-    // La regla de letras+números se mantiene igual que antes
+    // password: obligatorio, minimo 6 caracteres, maximo 100
+    // La regla de letras+numeros se mantiene igual que antes
     password: z
         .string({
             required_error:     'La contraseña es obligatoria',
@@ -48,13 +48,13 @@ export const loginSchema = z.object({
 // Cuerpo esperado: { name, documento, email, password }
 // Respuesta exitosa 201: { success, message, data: { user sin password } }
 //
-// Este schema es nuevo: no existía antes porque no había endpoint de registro.
+// Este schema es nuevo: no existia antes porque no habia endpoint de registro.
 // Las reglas de documento, name y email coinciden exactamente con createUserSchema
 // en user.schema.js para mantener consistencia en todo el proyecto.
-// La regla de password es la misma del loginSchema para no generar confusión.
+// La regla de password es la misma del loginSchema para no generar confusion.
 export const registerSchema = z.object({
 
-    // name: obligatorio, mínimo 3, máximo 100, solo letras y espacios
+    // name: obligatorio, minimo 3, maximo 100, solo letras y espacios
     // La misma regla que createUserSchema.name en user.schema.js
     name: z
         .string({
@@ -68,7 +68,7 @@ export const registerSchema = z.object({
             'El nombre solo puede contener letras y espacios'
         ),
 
-    // documento: obligatorio, solo números, mínimo 5, máximo 20
+    // documento: obligatorio, solo numeros, minimo 5, maximo 20
     // La misma regla que createUserSchema.documento en user.schema.js
     documento: z
         .string({
@@ -82,7 +82,7 @@ export const registerSchema = z.object({
             'El documento solo puede contener números'
         ),
 
-    // email: obligatorio, formato de correo válido, máximo 100
+    // email: obligatorio, formato de correo valido, maximo 100
     // La misma regla que createUserSchema.email en user.schema.js
     email: z
         .string({
@@ -92,7 +92,7 @@ export const registerSchema = z.object({
         .email('El correo electrónico no tiene un formato válido')
         .max(100, 'El correo no puede exceder los 100 caracteres'),
 
-    // password: obligatorio, mínimo 6 caracteres, máximo 100
+    // password: obligatorio, minimo 6 caracteres, maximo 100
     // La misma regla que loginSchema.password para consistencia
     password: z
         .string({
