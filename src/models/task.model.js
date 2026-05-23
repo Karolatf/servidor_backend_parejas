@@ -42,8 +42,6 @@ function formatearTarea(filaDb) {
         description:          filaDb.description,
         // status: recalculado si hay nota, o el estado guardado en la BD si no hay nota
         status,
-        // comment: comentario de seguimiento  null si no se escribio ninguno
-        comment:              filaDb.comment || null,
         // grade: nota numerica (0-100) o null si el instructor aun no califico
         grade,
         // gradeReason: motivo de la calificacion escrito por el instructor  null si no hay nota
@@ -118,7 +116,6 @@ export async function createTask({
     description,
     status        = 'pendiente',
     assignedUsers = [],
-    comment       = null
 }) {
     // Verificamos que ninguno de los usuarios asignados este inactivo antes de crear
     if (assignedUsers && assignedUsers.length > 0) {
@@ -139,8 +136,8 @@ export async function createTask({
 
     // Insertamos la tarea en la tabla tasks  grade y grade_reason empiezan en null
     const [result] = await pool.query(
-        'INSERT INTO tasks (title, description, status, comment) VALUES (?, ?, ?, ?)',
-        [title, description || '', status, comment || null]
+        'INSERT INTO tasks (title, description, status) VALUES (?, ?, ?)',
+        [title, description || '', status]
     );
     const taskId = result.insertId;
 
@@ -167,7 +164,6 @@ export async function updateTask(id, campos) {
 
     if (campos.title       !== undefined) camposDb.title       = campos.title;
     if (campos.description !== undefined) camposDb.description = campos.description;
-    if (campos.comment     !== undefined) camposDb.comment     = campos.comment || null;
 
     // grade: cuando se actualiza, el estado se recalcula para mantener consistencia
     if (campos.grade !== undefined) {
@@ -248,12 +244,10 @@ export async function getTasksByUserId(userId) {
 }
 
 // ── updateTaskStatus ──────────────────────────────────────────────────────────
-// Cambia el estado de una tarea y opcionalmente guarda un comentario del estudiante
+// Cambia el estado de una tarea.
 // Se usa en PATCH /api/tasks/:id/status  accesible por todos los roles autenticados
-export async function updateTaskStatus(id, status, comment) {
-    const campos = { status };
-    if (comment !== undefined) campos.comment = comment;
-    return updateTask(id, campos);
+export async function updateTaskStatus(id, status) {
+    return updateTask(id, { status });
 }
 
 // ── assignUsersToTask ─────────────────────────────────────────────────────────

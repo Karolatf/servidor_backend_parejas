@@ -155,7 +155,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     title        VARCHAR(200) NOT NULL,                       -- título descriptivo de la tarea
     description  TEXT         NULL,                           -- descripción detallada con instrucciones
     status       VARCHAR(30)  NOT NULL DEFAULT 'pendiente',   -- estado actual: pendiente | en_progreso | pendiente_aprobacion | completada | reprobada
-    comment      TEXT         NULL,                           -- comentario general de la tarea (visible a todos)
     grade        DECIMAL(5,2) NULL     DEFAULT NULL,          -- nota asignada (0.00 a 100.00); NULL = sin calificar
     grade_reason TEXT         NULL     DEFAULT NULL,          -- justificación de la calificación del instructor
     change_reason TEXT        NULL     DEFAULT NULL,          -- justificación cuando el instructor cambia estado sin calificar
@@ -334,6 +333,7 @@ CREATE TABLE IF NOT EXISTS comunicador_anuncios (
     autor_id   INT          NOT NULL,                      -- FK al usuario que creó el anuncio
     titulo     VARCHAR(200) NOT NULL,                      -- título del anuncio (visible en la lista)
     contenido  TEXT         NOT NULL,                      -- cuerpo completo del anuncio
+    target     VARCHAR(50)  NOT NULL DEFAULT 'todos',      -- rol destino: 'todos' o nombre de rol específico
     created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),

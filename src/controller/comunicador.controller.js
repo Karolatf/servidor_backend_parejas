@@ -18,6 +18,7 @@ import { successResponse, errorResponse } from '../utils/response.util.js';
 // Importamos las funciones del modelo  cada funcion maneja exactamente una operacion de BD
 import {
     getAllAnuncios,
+    getAllAnunciosPorRol,
     getAnuncioById,
     crearAnuncio,
     eliminarAnuncio,
@@ -35,8 +36,10 @@ import {
 // ACCESO: todos los roles autenticados (verifyToken en app.js es suficiente)
 // Los anuncios son broadcasts globales  cualquier usuario logueado puede verlos
 export const getAnuncios = catchAsync(async (req, res) => {
-    // getAllAnuncios hace el JOIN con users para incluir el nombre del autor
-    const anuncios = await getAllAnuncios();
+    // ?all=true lo usa el panel de gestión del comunicador para ver y eliminar todos los anuncios
+    const anuncios = req.query.all === 'true'
+        ? await getAllAnuncios()
+        : await getAllAnunciosPorRol(req.usuario.role);
     return successResponse(res, 'Anuncios obtenidos correctamente', anuncios);
 });
 
@@ -45,19 +48,20 @@ export const getAnuncios = catchAsync(async (req, res) => {
 // ACCESO: requiere permiso 'comunicador.anuncios' (verificado en la ruta)
 // Cuerpo esperado: { titulo, contenido }
 export const createAnuncio = catchAsync(async (req, res) => {
-    // Sacamos los dos campos del cuerpo del anuncio
-    const { titulo, contenido } = req.body;
+    const { titulo, contenido, target = 'todos' } = req.body;
 
-    // Validamos que los dos campos llegaron y no estan vacios
     if (!titulo || !contenido) {
         return errorResponse(res, 'El título y el contenido son obligatorios', 400);
     }
 
-    // req.usuario.id viene del JWT decodificado por verifyToken  es el autor del anuncio
+    const rolesValidos = ['todos', 'admin', 'instructor', 'user', 'auditor', 'comunicador', 'soporte'];
+    const targetFinal = rolesValidos.includes(target) ? target : 'todos';
+
     const nuevoAnuncio = await crearAnuncio({
         autorId:   req.usuario.id,
         titulo:    titulo.trim(),
         contenido: contenido.trim(),
+        target:    targetFinal,
     });
 
     // Respondemos con 201 Created y el anuncio recien creado con su id de MySQL

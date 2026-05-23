@@ -16,15 +16,13 @@ import pool from '../database/db.connection.js';
 // ╚══════════════════════════════════════════════════════════════╝
 
 // ── getAnuncioById ────────────────────────────────────────────────────────────
-// Busca un anuncio por su id  incluye nombre y rol del autor (JOIN con users)
-// Retorna el objeto del anuncio o null si no existe
 export async function getAnuncioById(id) {
-    // JOIN con users para obtener el nombre del autor en la misma query
     const [rows] = await pool.query(
         `SELECT ca.id,
                 ca.autor_id,
                 ca.titulo,
                 ca.contenido,
+                ca.target,
                 ca.created_at,
                 u.name AS autor_name,
                 u.role AS autor_role
@@ -33,23 +31,15 @@ export async function getAnuncioById(id) {
          WHERE ca.id = ?`,
         [Number(id)]
     );
-    // rows[0] es el primer resultado; undefined si no existe el id
     return rows[0] || null;
 }
 
 // ── getAllAnuncios ─────────────────────────────────────────────────────────────
-// Retorna todos los anuncios ordenados del mas reciente al mas antiguo
-// Los anuncios son globales: todos los roles autenticados pueden verlos
+// Retorna todos los anuncios sin filtro  usado en la vista de gestión del comunicador
 export async function getAllAnuncios() {
-    // ORDER BY created_at DESC para mostrar el mas reciente primero en el frontend
     const [rows] = await pool.query(
-        `SELECT ca.id,
-                ca.autor_id,
-                ca.titulo,
-                ca.contenido,
-                ca.created_at,
-                u.name AS autor_name,
-                u.role AS autor_role
+        `SELECT ca.id, ca.autor_id, ca.titulo, ca.contenido, ca.target, ca.created_at,
+                u.name AS autor_name, u.role AS autor_role
          FROM comunicador_anuncios ca
          JOIN users u ON u.id = ca.autor_id
          ORDER BY ca.created_at DESC`
@@ -57,19 +47,33 @@ export async function getAllAnuncios() {
     return rows;
 }
 
-// ── crearAnuncio ──────────────────────────────────────────────────────────────
-// Inserta un anuncio nuevo en comunicador_anuncios y retorna el objeto completo
-// Parametros:
-//   autorId    id del usuario que crea el anuncio (requiere comunicador.anuncios)
-//   titulo     titulo corto del anuncio
-//   contenido  cuerpo del anuncio
-export async function crearAnuncio({ autorId, titulo, contenido }) {
-    // Insertamos el anuncio con los 3 campos obligatorios
-    const [result] = await pool.query(
-        'INSERT INTO comunicador_anuncios (autor_id, titulo, contenido) VALUES (?, ?, ?)',
-        [Number(autorId), titulo, contenido]
+// ── getAllAnunciosPorRol ────────────────────────────────────────────────────────
+// Retorna los anuncios globales (target='todos') + los dirigidos al rol indicado
+export async function getAllAnunciosPorRol(role) {
+    const [rows] = await pool.query(
+        `SELECT ca.id,
+                ca.autor_id,
+                ca.titulo,
+                ca.contenido,
+                ca.target,
+                ca.created_at,
+                u.name AS autor_name,
+                u.role AS autor_role
+         FROM comunicador_anuncios ca
+         JOIN users u ON u.id = ca.autor_id
+         WHERE ca.target = 'todos' OR ca.target = ?
+         ORDER BY ca.created_at DESC`,
+        [role]
     );
-    // Retornamos el anuncio completo con el id recien generado por MySQL
+    return rows;
+}
+
+// ── crearAnuncio ──────────────────────────────────────────────────────────────
+export async function crearAnuncio({ autorId, titulo, contenido, target = 'todos' }) {
+    const [result] = await pool.query(
+        'INSERT INTO comunicador_anuncios (autor_id, titulo, contenido, target) VALUES (?, ?, ?, ?)',
+        [Number(autorId), titulo, contenido, target]
+    );
     return getAnuncioById(result.insertId);
 }
 

@@ -100,6 +100,8 @@ INSERT IGNORE INTO permissions (code, descripcion) VALUES
 -- ── Admin: gestión completa del sistema excepto calificar tareas ──────────────
 -- El admin NO tiene tasks.grade porque calificar es responsabilidad del instructor.
 -- El admin SÍ puede editar tareas no calificadas (tasks.update.ungraded).
+-- El admin NO tiene permisos de calendario por defecto; los obtiene solo si se le
+-- asigna el rol instructor como secundario (calendar.create + calendar.assign).
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r, permissions p
@@ -117,7 +119,7 @@ WHERE r.name = 'admin'
     'users.delete',          -- eliminar usuarios (soft o forzoso)
     'users.assign.role',     -- gestionar los roles adicionales de un usuario
     'users.deactivate',      -- desactivar/reactivar cuentas
-    'calendar.create'        -- crear eventos propios en el calendario
+    'soporte.actividad'      -- historial de acciones del sistema (siempre visible en sidebar del admin)
   );
 
 -- ── Instructor: gestión de tareas, calificaciones y calendario ────────────────
